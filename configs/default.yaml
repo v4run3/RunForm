@@ -1,0 +1,26 @@
+# RunForm default configuration (Phase 0 skeleton)
+# Thresholds here are PLACEHOLDERS — they get validated against the
+# biomechanics literature during Phase 5 (angle/feedback module).
+
+detection:
+  model: "yolov8n-pose.pt"   # smallest YOLOv8-pose; test n/s/m/l in Phase 2
+  conf: 0.5                  # detection confidence threshold
+  imgsz: 640                 # inference image size
+
+footstrike:
+  method: "rule_based"       # Option A from the workflow; Option B (ML) if poor accuracy
+  min_stance_frames: 3       # frames required to confirm a foot contact
+
+angles:
+  knee_flexion_risk_deg: 160   # placeholder — validate with literature
+  hip_rotation_risk_deg: 15    # placeholder — validate with literature
+
+tracking:
+  reid_buffer_frames: 30       # remember a runner this many frames after leaving frame
+
+feedback:
+  rules_path: "configs/risk_rules.yaml"  # created in Phase 5
+
+app:
+  title: "RunForm — Running Form Analysis"
+  icon: "🏃"

@@ -1,0 +1,42 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# --- Node & Frontend ---
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+*.local
+
+# --- Data & Media Storage ---
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+data/pose_media/
+data/user_media/
+data/videos/
+data/output/
+*.db
+*.sqlite
+*.sqlite3
+.auth_secret
+data/.auth_secret
+
+# --- Logs ---
+*.log
+backend.err.log
+backend.out.log
+
+# --- IDE / OS ---
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
