@@ -20,11 +20,18 @@ from .metrics import (
 )
 
 
+from .temporal_analysis import analyze_temporal_movement
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="RunForm video pose detection and running-form analysis.")
     parser.add_argument("video_path", type=Path, help="Path to the input video.")
     parser.add_argument("--output", type=Path, default=None, help="Optional path for annotated MP4 output.")
     parser.add_argument("--csv", type=Path, default=None, help="Optional frame-level metrics CSV output.")
+    parser.add_argument("--temporal-csv", type=Path, default=None, help="Optional window-level temporal features CSV output.")
+    parser.add_argument("--window-sec", type=float, default=2.0, help="Window duration for temporal analysis (seconds).")
+    parser.add_argument("--step-sec", type=float, default=None, help="Step duration between windows (seconds).")
+    parser.add_argument("--smooth-window", type=int, default=1, help="Optional smoothing window size (1 = no smoothing).")
     parser.add_argument("--no-display", action="store_true", help="Process without opening a display window.")
     parser.add_argument("--model-complexity", type=int, default=1, choices=[0, 1, 2])
     parser.add_argument("--model-path", type=Path, default=None, help="Optional MediaPipe .task model path.")
@@ -128,9 +135,28 @@ def main(argv: list[str] | None = None) -> int:
     summary = summarize_frame_metrics(frame_records)
     print_summary(summary)
 
+    temporal_result = analyze_temporal_movement(
+        frame_records,
+        window_sec=args.window_sec,
+        step_sec=args.step_sec,
+        smooth_window=args.smooth_window,
+        fps=fps,
+    )
+    print(f"\nTemporal Movement Analysis ({len(temporal_result.windows)} windows):")
+    tf = temporal_result.video_features
+    if tf.knee_left_mean is not None and tf.knee_left_rom is not None:
+        print(f"  Left knee ROM: {tf.knee_left_rom:.1f} deg (mean: {tf.knee_left_mean:.1f} deg, std: {tf.knee_left_std:.1f} deg)")
+    if tf.knee_right_mean is not None and tf.knee_right_rom is not None:
+        print(f"  Right knee ROM: {tf.knee_right_rom:.1f} deg (mean: {tf.knee_right_mean:.1f} deg, std: {tf.knee_right_std:.1f} deg)")
+    if tf.trunk_lean_mean is not None and tf.trunk_lean_rom is not None:
+        print(f"  Trunk lean ROM: {tf.trunk_lean_rom:.1f} deg (mean: {tf.trunk_lean_mean:.1f} deg, std: {tf.trunk_lean_std:.1f} deg)")
+
     if args.csv is not None:
         write_metrics_csv(frame_records, args.csv)
         print(f"\nSaved frame metrics CSV: {args.csv}")
+    if args.temporal_csv is not None:
+        temporal_result.write_windows_csv(args.temporal_csv)
+        print(f"Saved temporal windows CSV: {args.temporal_csv}")
     if args.output is not None:
         print(f"Saved annotated video: {args.output}")
 

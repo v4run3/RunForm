@@ -462,21 +462,27 @@ async def pose_analysis_endpoint(
         with open(input_path, "wb") as f:
             shutil.copyfileobj(file.file, f)
 
+        temporal_csv_path = pose_dir / "temporal_windows.csv"
         result = analyze_pose_video_file(
             input_path=str(input_path),
             output_path=str(output_path),
+            temporal_csv_path=str(temporal_csv_path),
         )
 
         summary = summary_to_dict(result.summary)
         video_url = f"/api/pose-video/{analysis_id}"
+        temporal_csv_url = f"/api/pose-temporal-csv/{analysis_id}"
+        temporal_dict = result.temporal_analysis.to_dict() if result.temporal_analysis else None
         return {
             "analysis_id": analysis_id,
             "video_id": analysis_id,
             "video_url": video_url,
             "annotated_video_url": video_url,
+            "temporal_csv_url": temporal_csv_url,
             "metrics": summary,
             "observations": summary.get("observations", []),
             "summary": summary,
+            "temporal_analysis": temporal_dict,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Pose analysis failed: {e}") from e
@@ -499,6 +505,19 @@ def get_pose_video(analysis_id: str):
         media_type="video/mp4",
         filename=f"runform_pose_{analysis_id}.mp4",
         headers={"Accept-Ranges": "bytes"},
+    )
+
+
+@app.get("/api/pose-temporal-csv/{analysis_id}")
+def get_pose_temporal_csv(analysis_id: str):
+    """Serve the CSV file containing temporal movement features for each time window."""
+    csv_path = POSE_MEDIA_DIR / analysis_id / "temporal_windows.csv"
+    if not csv_path.exists():
+        raise HTTPException(status_code=404, detail="Temporal features CSV not found")
+    return FileResponse(
+        path=csv_path,
+        media_type="text/csv",
+        filename=f"runform_temporal_{analysis_id}.csv",
     )
 
 

@@ -11,6 +11,9 @@ import {
   Info,
   Sparkles,
   Layers,
+  Download,
+  Clock,
+  TrendingUp,
 } from 'lucide-react';
 
 const API_BASE = '';
@@ -488,6 +491,227 @@ export default function VideoUploadView({ token, onSaved }) {
                       </li>
                     ))}
                   </ul>
+                </div>
+              )}
+
+              {/* Milestone 1: Temporal Movement Analysis */}
+              {poseResult?.temporal_analysis && (
+                <div className="glass-panel" style={{ padding: '16px', marginTop: '14px' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: '10px',
+                      marginBottom: '14px',
+                    }}
+                  >
+                    <div>
+                      <h4
+                        style={{
+                          fontSize: '1rem',
+                          fontWeight: 700,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                        }}
+                      >
+                        <TrendingUp size={18} color="var(--accent-cyan)" />
+                        Temporal Movement Analysis (Milestone 1)
+                      </h4>
+                      <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '3px' }}>
+                        Multi-frame movement kinematics & window-based feature extraction for ML training
+                      </p>
+                    </div>
+                    {poseResult.temporal_csv_url && (
+                      <a
+                        href={`${API_BASE}${poseResult.temporal_csv_url}`}
+                        download={`runform_temporal_${poseResult.analysis_id}.csv`}
+                        className="nav-tab-btn"
+                        style={{
+                          textDecoration: 'none',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          fontSize: '0.8rem',
+                          padding: '6px 12px',
+                        }}
+                      >
+                        <Download size={14} />
+                        Export Windows CSV
+                      </a>
+                    )}
+                  </div>
+
+                  {/* Temporal Highlights Cards */}
+                  {poseResult.temporal_analysis.video_features && (
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                        gap: '10px',
+                        marginBottom: '16px',
+                      }}
+                    >
+                      <div className="glass-panel metric-card">
+                        <span className="metric-label">Left Knee ROM</span>
+                        <div className="metric-value">
+                          {poseResult.temporal_analysis.video_features.knee_left_rom != null
+                            ? `${poseResult.temporal_analysis.video_features.knee_left_rom.toFixed(1)}°`
+                            : 'N/A'}
+                        </div>
+                        <span className="metric-sub">
+                          SD: ±{poseResult.temporal_analysis.video_features.knee_left_std != null
+                            ? `${poseResult.temporal_analysis.video_features.knee_left_std.toFixed(1)}°`
+                            : 'N/A'}
+                        </span>
+                      </div>
+
+                      <div className="glass-panel metric-card">
+                        <span className="metric-label">Right Knee ROM</span>
+                        <div className="metric-value">
+                          {poseResult.temporal_analysis.video_features.knee_right_rom != null
+                            ? `${poseResult.temporal_analysis.video_features.knee_right_rom.toFixed(1)}°`
+                            : 'N/A'}
+                        </div>
+                        <span className="metric-sub">
+                          SD: ±{poseResult.temporal_analysis.video_features.knee_right_std != null
+                            ? `${poseResult.temporal_analysis.video_features.knee_right_std.toFixed(1)}°`
+                            : 'N/A'}
+                        </span>
+                      </div>
+
+                      <div className="glass-panel metric-card">
+                        <span className="metric-label">Left Hip ROM</span>
+                        <div className="metric-value">
+                          {poseResult.temporal_analysis.video_features.hip_left_rom != null
+                            ? `${poseResult.temporal_analysis.video_features.hip_left_rom.toFixed(1)}°`
+                            : 'N/A'}
+                        </div>
+                        <span className="metric-sub">
+                          SD: ±{poseResult.temporal_analysis.video_features.hip_left_std != null
+                            ? `${poseResult.temporal_analysis.video_features.hip_left_std.toFixed(1)}°`
+                            : 'N/A'}
+                        </span>
+                      </div>
+
+                      <div className="glass-panel metric-card">
+                        <span className="metric-label">Right Hip ROM</span>
+                        <div className="metric-value">
+                          {poseResult.temporal_analysis.video_features.hip_right_rom != null
+                            ? `${poseResult.temporal_analysis.video_features.hip_right_rom.toFixed(1)}°`
+                            : 'N/A'}
+                        </div>
+                        <span className="metric-sub">
+                          SD: ±{poseResult.temporal_analysis.video_features.hip_right_std != null
+                            ? `${poseResult.temporal_analysis.video_features.hip_right_std.toFixed(1)}°`
+                            : 'N/A'}
+                        </span>
+                      </div>
+
+                      <div className="glass-panel metric-card">
+                        <span className="metric-label">Trunk Lean ROM</span>
+                        <div className="metric-value">
+                          {poseResult.temporal_analysis.video_features.trunk_lean_rom != null
+                            ? `${poseResult.temporal_analysis.video_features.trunk_lean_rom.toFixed(1)}°`
+                            : 'N/A'}
+                        </div>
+                        <span className="metric-sub">
+                          SD: ±{poseResult.temporal_analysis.video_features.trunk_lean_std != null
+                            ? `${poseResult.temporal_analysis.video_features.trunk_lean_std.toFixed(1)}°`
+                            : 'N/A'}
+                        </span>
+                      </div>
+
+                      <div className="glass-panel metric-card">
+                        <span className="metric-label">Knee Diff Var</span>
+                        <div className="metric-value">
+                          {poseResult.temporal_analysis.video_features.knee_asymmetry_std != null
+                            ? `±${poseResult.temporal_analysis.video_features.knee_asymmetry_std.toFixed(1)}°`
+                            : 'N/A'}
+                        </div>
+                        <span className="metric-sub">Diff std dev</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Window Breakdown Table */}
+                  {poseResult.temporal_analysis.windows && poseResult.temporal_analysis.windows.length > 0 && (
+                    <div style={{ marginTop: '12px' }}>
+                      <div
+                        style={{
+                          fontSize: '0.85rem',
+                          fontWeight: 600,
+                          color: 'var(--text-soft)',
+                          marginBottom: '8px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                        }}
+                      >
+                        <Clock size={14} /> Time Window Breakdown ({poseResult.temporal_analysis.window_duration_sec}s windows)
+                      </div>
+                      <div style={{ overflowX: 'auto' }}>
+                        <table
+                          style={{
+                            width: '100%',
+                            borderCollapse: 'collapse',
+                            fontSize: '0.8rem',
+                            textAlign: 'left',
+                          }}
+                        >
+                          <thead>
+                            <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-muted)' }}>
+                              <th style={{ padding: '8px 10px' }}>Window</th>
+                              <th style={{ padding: '8px 10px' }}>Time Span</th>
+                              <th style={{ padding: '8px 10px' }}>Valid Frames</th>
+                              <th style={{ padding: '8px 10px' }}>L Knee ROM</th>
+                              <th style={{ padding: '8px 10px' }}>R Knee ROM</th>
+                              <th style={{ padding: '8px 10px' }}>Trunk ROM</th>
+                              <th style={{ padding: '8px 10px' }}>Quality</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {poseResult.temporal_analysis.windows.map((w) => (
+                              <tr key={w.window_index} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                                <td style={{ padding: '8px 10px', fontWeight: 600 }}>#{w.window_index + 1}</td>
+                                <td style={{ padding: '8px 10px', color: 'var(--text-soft)' }}>
+                                  {w.start_time.toFixed(1)}s – {w.end_time.toFixed(1)}s
+                                </td>
+                                <td style={{ padding: '8px 10px' }}>
+                                  {w.valid_frames} / {w.total_frames}
+                                </td>
+                                <td style={{ padding: '8px 10px' }}>
+                                  {w.features.knee_left_rom != null ? `${w.features.knee_left_rom.toFixed(1)}°` : '—'}
+                                </td>
+                                <td style={{ padding: '8px 10px' }}>
+                                  {w.features.knee_right_rom != null ? `${w.features.knee_right_rom.toFixed(1)}°` : '—'}
+                                </td>
+                                <td style={{ padding: '8px 10px' }}>
+                                  {w.features.trunk_lean_rom != null ? `${w.features.trunk_lean_rom.toFixed(1)}°` : '—'}
+                                </td>
+                                <td style={{ padding: '8px 10px' }}>
+                                  <span
+                                    style={{
+                                      padding: '2px 8px',
+                                      borderRadius: '4px',
+                                      fontSize: '0.72rem',
+                                      fontWeight: 600,
+                                      background: w.is_reliable ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
+                                      color: w.is_reliable ? 'var(--accent-emerald)' : 'var(--accent-rose)',
+                                    }}
+                                  >
+                                    {w.is_reliable ? 'Reliable' : 'Low frames'}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

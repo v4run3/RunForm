@@ -20,6 +20,10 @@ from .metrics import (
     summarize_frame_metrics,
     write_metrics_csv,
 )
+from .temporal_analysis import (
+    TemporalAnalysisResult,
+    analyze_temporal_movement,
+)
 
 
 @dataclass
@@ -33,6 +37,8 @@ class PoseVideoAnalysisResult:
     fps: float
     width: int
     height: int
+    temporal_analysis: TemporalAnalysisResult | None = None
+    temporal_csv_path: Path | None = None
 
 
 def summary_to_dict(summary: RunningFormSummary) -> dict[str, object]:
@@ -111,15 +117,20 @@ def analyze_pose_video_file(
     input_path: str | Path,
     output_path: str | Path | None = None,
     csv_path: str | Path | None = None,
+    temporal_csv_path: str | Path | None = None,
+    window_sec: float = 2.0,
+    step_sec: float | None = None,
+    smooth_window: int = 1,
     min_detection_confidence: float = 0.5,
     min_tracking_confidence: float = 0.5,
     min_landmark_visibility: float = 0.3,
     max_frames: int = 0,
 ) -> PoseVideoAnalysisResult:
-    """Analyze a video with MediaPipe and optionally save overlay video/CSV."""
+    """Analyze a video with MediaPipe, compute temporal movement features, and optionally save overlay video/CSVs."""
     input_path = Path(input_path)
     output = Path(output_path) if output_path is not None else None
     csv_output = Path(csv_path) if csv_path is not None else None
+    temporal_csv_output = Path(temporal_csv_path) if temporal_csv_path is not None else None
 
     usable_input, is_temp = ensure_supported_input_video(input_path)
 
@@ -186,6 +197,17 @@ def analyze_pose_video_file(
         if csv_output is not None:
             write_metrics_csv(frame_records, csv_output)
 
+        temporal_result = analyze_temporal_movement(
+            frame_records,
+            window_sec=window_sec,
+            step_sec=step_sec,
+            smooth_window=smooth_window,
+            fps=fps,
+        )
+
+        if temporal_csv_output is not None:
+            temporal_result.write_windows_csv(temporal_csv_output)
+
         summary = summarize_frame_metrics(frame_records)
         return PoseVideoAnalysisResult(
             frames=frame_records,
@@ -195,6 +217,8 @@ def analyze_pose_video_file(
             fps=fps,
             width=width,
             height=height,
+            temporal_analysis=temporal_result,
+            temporal_csv_path=temporal_csv_output,
         )
     finally:
         if is_temp and usable_input.exists():
