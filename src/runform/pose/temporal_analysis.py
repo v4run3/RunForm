@@ -17,6 +17,14 @@ import math
 import statistics
 
 from .metrics import FrameMetrics, RunningFormMetrics, calculate_knee_asymmetry
+from .quality import (
+    DEFAULT_ANGLE_QUALITY_CONFIG,
+    DEFAULT_RELIABILITY_CONFIG,
+    AngleQualityConfig,
+    ReliabilityConfig,
+    calculate_reliability_score,
+    calculate_trunk_lean_rom_safe,
+)
 
 MONITORED_METRIC_FIELDS = (
     "left_knee_angle",
@@ -38,6 +46,12 @@ class TemporalFeatures:
     pose_confidence_mean: float | None = None
     missing_measurements: int = 0
     is_reliable: bool = False
+    reliability_score: float | None = None
+    reliability_issues: list[str] = field(default_factory=list)
+
+    # Camera view metadata
+    camera_view: str = "unknown"
+    view_quality_issues: list[str] = field(default_factory=list)
 
     # A. Knee measurements
     knee_left_mean: float | None = None
@@ -127,6 +141,8 @@ class WindowTemporalResult:
                 row[k] = ""
             elif isinstance(v, float):
                 row[k] = f"{v:.4f}"
+            elif isinstance(v, list):
+                row[k] = "; ".join(str(item) for item in v)
             else:
                 row[k] = v
         return row
@@ -170,6 +186,8 @@ class TemporalAnalysisResult:
                 row[k] = ""
             elif isinstance(v, float):
                 row[k] = f"{v:.4f}"
+            elif isinstance(v, list):
+                row[k] = "; ".join(str(item) for item in v)
             else:
                 row[k] = v
         return row
@@ -190,7 +208,6 @@ class TemporalAnalysisResult:
         path.parent.mkdir(parents=True, exist_ok=True)
         rows = self.to_window_csv_rows(video_id=video_id)
         if not rows:
-            # Write header with dummy window
             dummy = WindowTemporalResult(0, 0.0, 0.0, 0, 0, False, TemporalFeatures())
             dummy_row = dummy.as_csv_row()
             if video_id:
@@ -239,6 +256,9 @@ def calculate_temporal_features(
     frames: Sequence[FrameMetrics],
     min_valid_frames: int = 3,
     min_valid_ratio: float = 0.4,
+    camera_view: str = "unknown",
+    quality_config: AngleQualityConfig | None = None,
+    reliability_config: ReliabilityConfig | None = None,
 ) -> TemporalFeatures:
     """Calculate temporal movement features across a sequence of frame measurements."""
     total_frames = len(frames)
@@ -250,6 +270,8 @@ def calculate_temporal_features(
             pose_confidence_mean=None,
             missing_measurements=0,
             is_reliable=False,
+            reliability_score=0.0,
+            camera_view=camera_view,
         )
 
     valid_pose_frames = sum(1 for f in frames if f.pose_detected)
@@ -258,8 +280,9 @@ def calculate_temporal_features(
     confidences = _clean_finite([f.pose_confidence for f in frames if f.pose_detected])
     pose_confidence_mean = float(statistics.fmean(confidences)) if confidences else None
 
-    # Count missing measurements across the 5 monitored joint channels
+    # Count missing and valid measurements across the 5 monitored joint channels
     missing_count = 0
+    valid_counts: dict[str, int] = {f: 0 for f in MONITORED_METRIC_FIELDS}
     for f in frames:
         if not f.pose_detected:
             missing_count += len(MONITORED_METRIC_FIELDS)
@@ -268,10 +291,8 @@ def calculate_temporal_features(
                 val = getattr(f.metrics, field_name, None)
                 if val is None or not math.isfinite(float(val)):
                     missing_count += 1
-
-    is_reliable = (valid_pose_frames >= min_valid_frames) and (
-        valid_pose_frame_ratio >= min_valid_ratio
-    )
+                else:
+                    valid_counts[field_name] += 1
 
     # Knee measurements
     left_knee_vals = [f.metrics.left_knee_angle for f in frames if f.pose_detected]
@@ -281,7 +302,6 @@ def calculate_temporal_features(
     rk_mean, rk_std, rk_min, rk_max, rk_rom = _compute_stats(right_knee_vals)
 
     # Bilateral knee difference & asymmetry
-    # Pairwise difference is calculated for frames where both knees are valid
     knee_diffs: list[float] = []
     knee_asymmetries: list[float] = []
     for f in frames:
@@ -304,9 +324,35 @@ def calculate_temporal_features(
     right_hip_vals = [f.metrics.right_hip_angle for f in frames if f.pose_detected]
     rh_mean, rh_std, rh_min, rh_max, rh_rom = _compute_stats(right_hip_vals)
 
-    # Trunk measurements
+    # Trunk measurements - safe ROM calculation for angle wrapping at ±180° boundary
     trunk_vals = [f.metrics.trunk_lean for f in frames if f.pose_detected]
-    tl_mean, tl_std, tl_min, tl_max, tl_rom = _compute_stats(trunk_vals)
+    tl_mean, tl_std, tl_min, tl_max, _ = _compute_stats(trunk_vals)
+    tl_rom = calculate_trunk_lean_rom_safe(tl_min, tl_max, trunk_vals)
+
+    # Calculate measurement stabilities (coefficient of variation: std / |mean|)
+    stabilities: dict[str, float | None] = {
+        "left_knee": (lk_std / lk_mean) if lk_mean and lk_std is not None and lk_mean != 0 else None,
+        "right_knee": (rk_std / rk_mean) if rk_mean and rk_std is not None and rk_mean != 0 else None,
+        "left_hip": (lh_std / lh_mean) if lh_mean and lh_std is not None and lh_mean != 0 else None,
+        "right_hip": (rh_std / rh_mean) if rh_mean and rh_std is not None and rh_mean != 0 else None,
+        "trunk_lean": (tl_std / abs(tl_mean)) if tl_mean and abs(tl_mean) > 1.0 and tl_std is not None else None,
+    }
+
+    # Multi-factor reliability calculation
+    rel_cfg = reliability_config or DEFAULT_RELIABILITY_CONFIG
+    rel_score, is_rel, issues = calculate_reliability_score(
+        total_frames=total_frames,
+        valid_pose_frames=valid_pose_frames,
+        valid_measurements=valid_counts,
+        landmark_visibilities={},
+        measurement_stabilities=stabilities,
+        config=rel_cfg,
+        camera_view=camera_view,
+        min_valid_frames=min_valid_frames,
+        min_valid_ratio=min_valid_ratio,
+    )
+
+    view_issues = [iss for iss in issues if "view" in iss.lower() or "planar" in iss.lower()]
 
     return TemporalFeatures(
         total_frames=total_frames,
@@ -314,7 +360,11 @@ def calculate_temporal_features(
         valid_pose_frame_ratio=valid_pose_frame_ratio,
         pose_confidence_mean=pose_confidence_mean,
         missing_measurements=missing_count,
-        is_reliable=is_reliable,
+        is_reliable=is_rel,
+        reliability_score=rel_score,
+        reliability_issues=issues,
+        camera_view=camera_view,
+        view_quality_issues=view_issues,
         # Knees
         knee_left_mean=lk_mean,
         knee_left_std=lk_std,
@@ -354,12 +404,7 @@ def smooth_frame_metrics(
     frames: Sequence[FrameMetrics],
     window_size: int = 1,
 ) -> list[FrameMetrics]:
-    """Apply an optional moving average over continuous angle series.
-
-    When window_size <= 1, returns the original frame records unmodified.
-    When window_size > 1, computes a centered moving average over finite values
-    without altering original frame structures or smoothing away discrete events.
-    """
+    """Apply an optional moving average over continuous angle series."""
     if window_size <= 1 or len(frames) <= 1:
         return list(frames)
 
@@ -411,6 +456,8 @@ def smooth_frame_metrics(
                 pose_detected=f.pose_detected,
                 pose_confidence=f.pose_confidence,
                 metrics=new_metrics,
+                raw_metrics=f.raw_metrics,
+                measurement_quality=f.measurement_quality,
             )
         )
     return smoothed_frames
@@ -424,26 +471,11 @@ def analyze_temporal_movement(
     min_valid_ratio: float = 0.4,
     smooth_window: int = 1,
     fps: float | None = None,
+    camera_view: str = "unknown",
+    quality_config: AngleQualityConfig | None = None,
+    reliability_config: ReliabilityConfig | None = None,
 ) -> TemporalAnalysisResult:
-    """Analyze a sequence of frame measurements using full-video and window-based temporal analysis.
-
-    Parameters
-    ----------
-    frames : Sequence[FrameMetrics]
-        Frame-level measurements from MediaPipe pose detector.
-    window_sec : float, default 2.0
-        Duration of each temporal analysis window in seconds (e.g. 1.0, 2.0, 3.0).
-    step_sec : float | None, default None
-        Step duration between window starts. Defaults to window_sec (non-overlapping).
-    min_valid_frames : int, default 3
-        Minimum valid pose frames required for a window or sequence to be considered reliable.
-    min_valid_ratio : float, default 0.4
-        Minimum fraction of valid pose frames required for reliability.
-    smooth_window : int, default 1
-        Optional rolling average window size (1 = raw, no smoothing).
-    fps : float | None, default None
-        Video frame rate. Inferred from timestamps if omitted.
-    """
+    """Analyze a sequence of frame measurements using full-video and window-based temporal analysis."""
     total_frames = len(frames)
     win_sec = max(0.1, float(window_sec))
     step = float(step_sec) if step_sec is not None and step_sec > 0 else win_sec
@@ -456,6 +488,8 @@ def analyze_temporal_movement(
             pose_confidence_mean=None,
             missing_measurements=0,
             is_reliable=False,
+            reliability_score=0.0,
+            camera_view=camera_view,
         )
         return TemporalAnalysisResult(
             video_features=empty_features,
@@ -475,7 +509,6 @@ def analyze_temporal_movement(
     min_t = timestamps[0]
     max_t = timestamps[-1]
 
-    # In case timestamps were non-monotonic or zero (e.g. synthetic test frames)
     if max_t <= min_t and total_frames > 1:
         eff_fps = fps if fps and fps > 0 else 30.0
         timestamps = [f.frame / eff_fps for f in processed_frames]
@@ -492,6 +525,9 @@ def analyze_temporal_movement(
         processed_frames,
         min_valid_frames=min_valid_frames,
         min_valid_ratio=min_valid_ratio,
+        camera_view=camera_view,
+        quality_config=quality_config,
+        reliability_config=reliability_config,
     )
 
     # Generate temporal windows
@@ -499,11 +535,8 @@ def analyze_temporal_movement(
     window_idx = 0
     curr_start = min_t
 
-    # Loop through time windows
     while curr_start <= max_t:
         curr_end = curr_start + win_sec
-        # Find frames in window [curr_start, curr_end)
-        # For the final window edge, allow inclusive <= max_t
         if curr_end >= max_t:
             window_frames = [
                 f for f, t in zip(processed_frames, timestamps) if curr_start <= t <= max_t
@@ -517,6 +550,9 @@ def analyze_temporal_movement(
             window_frames,
             min_valid_frames=min_valid_frames,
             min_valid_ratio=min_valid_ratio,
+            camera_view=camera_view,
+            quality_config=quality_config,
+            reliability_config=reliability_config,
         )
 
         valid_in_win = sum(1 for f in window_frames if f.pose_detected)
@@ -538,12 +574,14 @@ def analyze_temporal_movement(
         if curr_start > max_t:
             break
 
-    # If duration is very short and no window was generated, guarantee at least 1 window
     if not windows:
         win_features = calculate_temporal_features(
             processed_frames,
             min_valid_frames=min_valid_frames,
             min_valid_ratio=min_valid_ratio,
+            camera_view=camera_view,
+            quality_config=quality_config,
+            reliability_config=reliability_config,
         )
         windows.append(
             WindowTemporalResult(

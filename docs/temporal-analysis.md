@@ -55,8 +55,26 @@ The module extracts features across three anatomical regions and overall pose qu
 - **`valid_pose_frames`**: Number of frames where body landmarks were detected.
 - **`valid_pose_frame_ratio`**: Ratio of detected frames to total frames (`valid / total`).
 - **`pose_confidence_mean`**: Average landmark visibility/presence confidence from MediaPipe.
-- **`missing_measurements`**: Integer count of missing or non-finite joint angle slots across the evaluated frames.
-- **`is_reliable`**: Boolean flag indicating whether sufficient valid frames and tracking coverage exist (`valid_pose_frames >= min_valid_frames` and `valid_pose_frame_ratio >= min_valid_ratio`).
+- **`missing_measurements`**: Integer count of missing, degenerate, or rejected joint angle slots.
+- **`camera_view`**: Viewpoint metadata (`"side"`, `"front"`, `"rear"`, or `"unknown"`).
+- **`view_quality_issues`**: Specific measurement warnings triggered by viewpoint limitations (e.g., knee foreshortening in front view).
+- **`reliability_score`**: Continuous multi-factor quality score in $[0.0, 1.0]$ based on frame coverage, landmark visibility, valid measurement ratio, and stability.
+- **`reliability_issues`**: Descriptive list of reasons for degraded quality.
+- **`is_reliable`**: Boolean flag indicating whether tracking coverage, landmark visibility, and viewpoint compatibility are sufficient for sagittal gait analysis.
+
+---
+
+## 3. Measurement Quality Assurance & Plausibility Filtering
+
+Pose-derived biomechanical features undergo strict software-level quality validation:
+
+1. **Plausibility Filtering**: Angles outside anatomical bounds (knee $[20^\circ, 185^\circ]$, hip $[45^\circ, 190^\circ]$, trunk lean $[-45^\circ, 45^\circ]$) are rejected in filtered metrics and set to `None`, preventing corrupt statistics from planar foreshortening. Raw measurements are preserved in `frame.raw_metrics`.
+2. **Boundary Discontinuity Protection**: Trunk lean range of motion is calculated using `calculate_trunk_lean_rom_safe`, which resolves $\pm 180^\circ$ phase wrapping and prevents artificial $\approx 360^\circ$ ROM artifacts.
+3. **Degenerate Segments**: Collapsed limbs (segment length $\le 10^{-6}$) return `None` rather than false 0.0° angles.
+4. **Camera Viewpoint Isolation**: Front and rear views are flagged as invalid for sagittal knee and hip flexion/extension due to planar foreshortening. Viewpoint-limited features are never silently blended with side-view data.
+5. **No Silent Zero-Replacement**: Rejected or missing values remain `None` and are excluded from statistics without distorting true running ranges.
+
+For detailed documentation, see [`docs/pose-measurement-quality.md`](pose-measurement-quality.md).
 
 ---
 

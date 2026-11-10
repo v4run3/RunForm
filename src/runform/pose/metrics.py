@@ -10,6 +10,11 @@ import statistics
 
 from .angles import calculate_pose_angles
 from .landmarks import PoseResult
+from .quality import (
+    DEFAULT_ANGLE_QUALITY_CONFIG,
+    AngleQualityConfig,
+    validate_angle_plausibility,
+)
 
 METRIC_FIELDS = [
     "left_knee_angle",
@@ -37,7 +42,16 @@ class RunningFormMetrics:
     knee_asymmetry: float | None = None
 
     def as_dict(self) -> dict[str, float | None]:
-        return asdict(self)
+        return {
+            "left_knee_angle": self.left_knee_angle,
+            "right_knee_angle": self.right_knee_angle,
+            "left_hip_angle": self.left_hip_angle,
+            "right_hip_angle": self.right_hip_angle,
+            "left_elbow_angle": self.left_elbow_angle,
+            "right_elbow_angle": self.right_elbow_angle,
+            "trunk_lean": self.trunk_lean,
+            "knee_asymmetry": self.knee_asymmetry,
+        }
 
 
 @dataclass
@@ -49,6 +63,8 @@ class FrameMetrics:
     pose_detected: bool
     pose_confidence: float | None
     metrics: RunningFormMetrics
+    raw_metrics: RunningFormMetrics | None = None
+    measurement_quality: dict[str, str] | None = None
 
     def as_csv_row(self) -> dict[str, object]:
         row: dict[str, object] = {
@@ -88,24 +104,95 @@ def calculate_knee_asymmetry(
     return abs(left_knee_angle - right_knee_angle)
 
 
+def extract_raw_and_filtered_metrics(
+    result: PoseResult | None,
+    min_visibility: float = 0.3,
+    filter_implausible: bool = True,
+    quality_config: AngleQualityConfig | None = None,
+) -> tuple[RunningFormMetrics, RunningFormMetrics, dict[str, str]]:
+    """Extract raw angles and apply configurable plausibility quality filtering.
+
+    Returns:
+        Tuple of (filtered_metrics, raw_metrics, quality_flags)
+    """
+    cfg = quality_config or DEFAULT_ANGLE_QUALITY_CONFIG
+    raw_angles = calculate_pose_angles(result, min_visibility=min_visibility)
+
+    raw_lk = raw_angles.get("left_knee")
+    raw_rk = raw_angles.get("right_knee")
+    raw_lh = raw_angles.get("left_hip")
+    raw_rh = raw_angles.get("right_hip")
+    raw_le = raw_angles.get("left_elbow")
+    raw_re = raw_angles.get("right_elbow")
+    raw_tl = raw_angles.get("trunk_lean")
+    raw_asym = calculate_knee_asymmetry(raw_lk, raw_rk)
+
+    raw_metrics = RunningFormMetrics(
+        left_knee_angle=raw_lk,
+        right_knee_angle=raw_rk,
+        left_hip_angle=raw_lh,
+        right_hip_angle=raw_rh,
+        left_elbow_angle=raw_le,
+        right_elbow_angle=raw_re,
+        trunk_lean=raw_tl,
+        knee_asymmetry=raw_asym,
+    )
+
+    if not filter_implausible:
+        return raw_metrics, raw_metrics, {}
+
+    flags: dict[str, str] = {}
+    filtered_angles: dict[str, float | None] = {}
+
+    for name, raw_val in [
+        ("left_knee", raw_lk),
+        ("right_knee", raw_rk),
+        ("left_hip", raw_lh),
+        ("right_hip", raw_rh),
+        ("left_elbow", raw_le),
+        ("right_elbow", raw_re),
+        ("trunk_lean", raw_tl),
+    ]:
+        if raw_val is None:
+            filtered_angles[name] = None
+            continue
+        status, reason = validate_angle_plausibility(name, raw_val, cfg)
+        if status == "valid":
+            filtered_angles[name] = raw_val
+        else:
+            filtered_angles[name] = None
+            flags[name] = f"{status}: {reason}"
+
+    filtered_lk = filtered_angles["left_knee"]
+    filtered_rk = filtered_angles["right_knee"]
+    filtered_metrics = RunningFormMetrics(
+        left_knee_angle=filtered_lk,
+        right_knee_angle=filtered_rk,
+        left_hip_angle=filtered_angles["left_hip"],
+        right_hip_angle=filtered_angles["right_hip"],
+        left_elbow_angle=filtered_angles["left_elbow"],
+        right_elbow_angle=filtered_angles["right_elbow"],
+        trunk_lean=filtered_angles["trunk_lean"],
+        knee_asymmetry=calculate_knee_asymmetry(filtered_lk, filtered_rk),
+    )
+
+    return filtered_metrics, raw_metrics, flags
+
+
 def calculate_running_form_metrics(
     result: PoseResult | None,
     min_visibility: float = 0.3,
+    filter_implausible: bool = True,
+    quality_config: AngleQualityConfig | None = None,
 ) -> RunningFormMetrics:
-    """Calculate frame-level running-form metrics from a pose result."""
-    angles = calculate_pose_angles(result, min_visibility=min_visibility)
-    left_knee = angles.get("left_knee")
-    right_knee = angles.get("right_knee")
-    return RunningFormMetrics(
-        left_knee_angle=left_knee,
-        right_knee_angle=right_knee,
-        left_hip_angle=angles.get("left_hip"),
-        right_hip_angle=angles.get("right_hip"),
-        left_elbow_angle=angles.get("left_elbow"),
-        right_elbow_angle=angles.get("right_elbow"),
-        trunk_lean=angles.get("trunk_lean"),
-        knee_asymmetry=calculate_knee_asymmetry(left_knee, right_knee),
+    """Calculate frame-level running-form metrics from a pose result with optional filtering."""
+    filtered, _, _ = extract_raw_and_filtered_metrics(
+        result,
+        min_visibility=min_visibility,
+        filter_implausible=filter_implausible,
+        quality_config=quality_config,
     )
+    return filtered
 
 
 def analyze_frame_metrics(
@@ -113,16 +200,26 @@ def analyze_frame_metrics(
     timestamp: float,
     result: PoseResult | None,
     min_visibility: float = 0.3,
+    filter_implausible: bool = True,
+    quality_config: AngleQualityConfig | None = None,
 ) -> FrameMetrics:
-    """Build one frame-metrics record, safely handling missing poses."""
+    """Build one frame-metrics record, safely preserving both raw and filtered values."""
     pose_detected = result is not None and result.detected
     confidence = result.confidence if pose_detected and result is not None else None
+    filtered, raw, flags = extract_raw_and_filtered_metrics(
+        result,
+        min_visibility=min_visibility,
+        filter_implausible=filter_implausible,
+        quality_config=quality_config,
+    )
     return FrameMetrics(
         frame=frame_index,
         timestamp=timestamp,
         pose_detected=pose_detected,
         pose_confidence=confidence,
-        metrics=calculate_running_form_metrics(result, min_visibility=min_visibility),
+        metrics=filtered,
+        raw_metrics=raw,
+        measurement_quality=flags if flags else None,
     )
 
 

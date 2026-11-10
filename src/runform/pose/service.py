@@ -20,6 +20,7 @@ from .metrics import (
     summarize_frame_metrics,
     write_metrics_csv,
 )
+from .quality import AngleQualityConfig, ReliabilityConfig
 from .temporal_analysis import (
     TemporalAnalysisResult,
     analyze_temporal_movement,
@@ -80,6 +81,8 @@ def analyze_pose_frame_image(
     min_detection_confidence: float = 0.5,
     min_tracking_confidence: float = 0.5,
     min_landmark_visibility: float = 0.3,
+    filter_implausible: bool = True,
+    quality_config: AngleQualityConfig | None = None,
 ) -> tuple[FrameMetrics, np.ndarray]:
     """Analyze one BGR frame and return metrics plus annotated image."""
     detector = MediaPipePoseDetector(
@@ -93,6 +96,8 @@ def analyze_pose_frame_image(
             timestamp=time.time(),
             result=result,
             min_visibility=min_landmark_visibility,
+            filter_implausible=filter_implausible,
+            quality_config=quality_config,
         )
         annotated = draw_pose_overlay(
             frame,
@@ -125,6 +130,10 @@ def analyze_pose_video_file(
     min_tracking_confidence: float = 0.5,
     min_landmark_visibility: float = 0.3,
     max_frames: int = 0,
+    camera_view: str = "unknown",
+    filter_implausible: bool = True,
+    quality_config: AngleQualityConfig | None = None,
+    reliability_config: ReliabilityConfig | None = None,
 ) -> PoseVideoAnalysisResult:
     """Analyze a video with MediaPipe, compute temporal movement features, and optionally save overlay video/CSVs."""
     input_path = Path(input_path)
@@ -171,6 +180,8 @@ def analyze_pose_video_file(
                     timestamp=frame_index / fps,
                     result=result,
                     min_visibility=min_landmark_visibility,
+                    filter_implausible=filter_implausible,
+                    quality_config=quality_config,
                 )
                 frame_records.append(frame_metrics)
 
@@ -203,6 +214,9 @@ def analyze_pose_video_file(
             step_sec=step_sec,
             smooth_window=smooth_window,
             fps=fps,
+            camera_view=camera_view,
+            quality_config=quality_config,
+            reliability_config=reliability_config,
         )
 
         if temporal_csv_output is not None:

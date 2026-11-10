@@ -1,8 +1,9 @@
-﻿"""Landmark data structures and names used by the simple pose prototype."""
+"""Landmark data structures and names used by the simple pose prototype."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Literal
 
 
 @dataclass(frozen=True)
@@ -16,6 +17,10 @@ class PoseLandmark:
     visibility: float = 0.0
 
 
+# Camera view types for view-specific measurement handling
+CameraView = Literal["side", "front", "rear", "unknown"]
+
+
 @dataclass
 class PoseResult:
     """Pose landmarks for one detected person in one frame."""
@@ -25,6 +30,7 @@ class PoseResult:
     image_width: int = 0
     image_height: int = 0
     bbox: tuple[float, float, float, float] | None = None
+    camera_view: CameraView = "unknown"
 
     @property
     def detected(self) -> bool:
@@ -35,6 +41,24 @@ class PoseResult:
         if landmark is None or landmark.visibility < min_visibility:
             return None
         return landmark
+
+    def get_landmarks_for_angle(
+        self, names: list[str], min_visibility: float = 0.3
+    ) -> tuple[list[PoseLandmark], list[str]]:
+        """Get landmarks for angle calculation with visibility check.
+
+        Returns:
+            Tuple of (valid_landmarks, missing_landmark_names)
+        """
+        valid = []
+        missing = []
+        for name in names:
+            lm = self.get(name, min_visibility=min_visibility)
+            if lm is not None:
+                valid.append(lm)
+            else:
+                missing.append(name)
+        return valid, missing
 
 
 POSE_LANDMARK_NAMES = [

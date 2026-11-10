@@ -33,6 +33,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--step-sec", type=float, default=None, help="Step duration between windows (seconds).")
     parser.add_argument("--smooth-window", type=int, default=1, help="Optional smoothing window size (1 = no smoothing).")
     parser.add_argument("--no-display", action="store_true", help="Process without opening a display window.")
+    parser.add_argument("--camera-view", choices=["side", "front", "rear", "unknown"], default="unknown", help="Optional camera viewpoint metadata.")
+    parser.add_argument("--no-filter-implausible", action="store_true", help="Disable biomechanical plausibility filtering.")
     parser.add_argument("--model-complexity", type=int, default=1, choices=[0, 1, 2])
     parser.add_argument("--model-path", type=Path, default=None, help="Optional MediaPipe .task model path.")
     parser.add_argument("--min-detection-confidence", type=float, default=0.5)
@@ -98,6 +100,7 @@ def main(argv: list[str] | None = None) -> int:
                 timestamp=timestamp,
                 result=result,
                 min_visibility=args.min_landmark_visibility,
+                filter_implausible=not args.no_filter_implausible,
             )
             frame_records.append(frame_metrics)
 
@@ -141,6 +144,7 @@ def main(argv: list[str] | None = None) -> int:
         step_sec=args.step_sec,
         smooth_window=args.smooth_window,
         fps=fps,
+        camera_view=args.camera_view,
     )
     print(f"\nTemporal Movement Analysis ({len(temporal_result.windows)} windows):")
     tf = temporal_result.video_features
