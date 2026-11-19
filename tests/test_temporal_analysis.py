@@ -5,17 +5,14 @@ from __future__ import annotations
 import csv
 import json
 import math
-from pathlib import Path
 import statistics
+from pathlib import Path
 
 import pytest
 
 from runform.pose.metrics import FrameMetrics, RunningFormMetrics, RunningFormSummary
 from runform.pose.service import summary_to_dict
 from runform.pose.temporal_analysis import (
-    TemporalAnalysisResult,
-    TemporalFeatures,
-    WindowTemporalResult,
     analyze_temporal_movement,
     calculate_temporal_features,
     smooth_frame_metrics,

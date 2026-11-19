@@ -7,29 +7,44 @@ export default function AnalysisHistoryView({ token, refreshKey }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  const loadHistory = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`${API_BASE}/api/analyses`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json().catch(() => []);
-      if (!res.ok) {
-        throw new Error(data.detail || 'Could not load history');
-      }
-      setItems(data);
-    } catch (err) {
-      setError(err.message || 'Could not load history');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [manualRefresh, setManualRefresh] = useState(0);
 
   useEffect(() => {
-    loadHistory();
-  }, [token, refreshKey]);
+    let ignore = false;
+    const fetchHistory = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(`${API_BASE}/api/analyses`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json().catch(() => []);
+        if (!res.ok) {
+          throw new Error(data.detail || 'Could not load history');
+        }
+        if (!ignore) {
+          setItems(Array.isArray(data) ? data : []);
+        }
+      } catch (err) {
+        if (!ignore) {
+          setError(err.message || 'Could not load history');
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchHistory();
+    return () => {
+      ignore = true;
+    };
+  }, [token, refreshKey, manualRefresh]);
+
+  const loadHistory = () => {
+    setManualRefresh((prev) => prev + 1);
+  };
 
   const download = async (url, filename) => {
     const res = await fetch(`${API_BASE}${url}`, {

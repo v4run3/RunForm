@@ -7,6 +7,7 @@ Computes 2D joint angles (knee flexion, hip extension, trunk lean) from
 from __future__ import annotations
 
 import math
+
 import numpy as np
 
 from runform.schema import BiomechanicalMetrics, Keypoint, PoseDetection

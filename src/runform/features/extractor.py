@@ -7,11 +7,11 @@ labelled dataset.
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
-from pathlib import Path
 import csv
 import math
 import statistics
+from dataclasses import asdict, dataclass
+from pathlib import Path
 
 from runform.schema import FootStrikeType, FrameAnalysisResult, PoseDetection
 

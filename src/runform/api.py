@@ -11,20 +11,19 @@ import hashlib
 import hmac
 import json
 import os
-from pathlib import Path
 import secrets
 import shutil
 import sqlite3
-import tempfile
 import time
-from typing import Any
 import uuid
+from pathlib import Path
+from typing import Any
 
 import cv2
-from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
+import numpy as np
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-import numpy as np
 from pydantic import BaseModel
 
 from runform.pipeline import RunFormPipeline
@@ -443,6 +442,7 @@ def get_processed_video(video_id: str, user: dict[str, str] = Depends(current_us
 @app.post("/api/pose-analysis")
 async def pose_analysis_endpoint(
     file: UploadFile = File(...),
+    camera_view: str = Form("unknown"),
 ) -> dict[str, Any]:
     """Run MediaPipe-based running-form analysis on an uploaded video.
 
@@ -467,6 +467,7 @@ async def pose_analysis_endpoint(
             input_path=str(input_path),
             output_path=str(output_path),
             temporal_csv_path=str(temporal_csv_path),
+            camera_view=camera_view,
         )
 
         summary = summary_to_dict(result.summary)

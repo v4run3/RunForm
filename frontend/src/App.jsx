@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import './App.css';
 import { UploadCloud, Camera, BookOpen, Footprints, History, LogOut } from 'lucide-react';
 import VideoUploadView from './components/VideoUploadView';
@@ -11,15 +11,19 @@ const SESSION_KEY = 'runform_session';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('upload');
-  const [session, setSession] = useState(null);
-  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
-
-  useEffect(() => {
+  const [session, setSession] = useState(() => {
+    if (typeof window === 'undefined') return null;
     const saved = localStorage.getItem(SESSION_KEY);
     if (saved) {
-      setSession(JSON.parse(saved));
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return null;
+      }
     }
-  }, []);
+    return null;
+  });
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
 
   const handleAuth = (authSession) => {
     localStorage.setItem(SESSION_KEY, JSON.stringify(authSession));

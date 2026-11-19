@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 import pytest
 
 from runform.pose.angles import calculate_angle, calculate_pose_angles
@@ -10,23 +9,16 @@ from runform.pose.landmarks import PoseLandmark, PoseResult
 from runform.pose.metrics import (
     FrameMetrics,
     RunningFormMetrics,
-    analyze_frame_metrics,
-    calculate_running_form_metrics,
     extract_raw_and_filtered_metrics,
 )
 from runform.pose.quality import (
-    DEFAULT_ANGLE_QUALITY_CONFIG,
-    AngleQualityConfig,
-    ReliabilityConfig,
     calculate_reliability_score,
     calculate_trunk_lean_rom_safe,
     is_measurement_valid_for_view,
     validate_angle_plausibility,
 )
 from runform.pose.temporal_analysis import (
-    TemporalFeatures,
     analyze_temporal_movement,
-    calculate_temporal_features,
 )
 
 
@@ -114,8 +106,6 @@ def test_implausible_knee_angles_are_filtered_and_preserved_in_raw():
     status_ok, _ = validate_angle_plausibility("left_knee", 145.0)
     assert status_ok == "valid"
 
-    # In extract_raw_and_filtered_metrics
-    dummy_pose = _make_dummy_pose()
     # Mocking angle dict with implausible knee
     metrics = FrameMetrics(
         frame=0,
@@ -305,3 +295,4 @@ def test_degenerate_zero_length_segment_returns_none():
     # Vertex and point_a are the exact same coordinates
     angle = calculate_angle((1.0, 1.0), (1.0, 1.0), (2.0, 1.0))
     assert angle is None
+

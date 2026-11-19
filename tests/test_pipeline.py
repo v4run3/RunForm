@@ -7,7 +7,6 @@ from runform.detection.detector import MockPoseDetector
 from runform.pipeline import RunFormPipeline
 from runform.schema import (
     FootStrikeType,
-    InjuryRiskLevel,
     Keypoint,
     PoseDetection,
 )

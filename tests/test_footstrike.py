@@ -1,6 +1,5 @@
 """Unit tests for foot strike classification and contact detection."""
 
-import pytest
 
 from runform.footstrike.detector import FootStrikeDetector
 from runform.schema import FootStrikeType, Keypoint, PoseDetection

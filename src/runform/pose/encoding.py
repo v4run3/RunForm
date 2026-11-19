@@ -9,9 +9,9 @@ from __future__ import annotations
 
 import logging
 import os
-from pathlib import Path
 import shutil
 import subprocess
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -100,8 +100,7 @@ def convert_to_browser_mp4(
     try:
         subprocess.run(
             cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             check=True,
         )
         if same_file:
@@ -177,8 +176,7 @@ def ensure_supported_input_video(input_path: str | Path) -> tuple[Path, bool]:
     try:
         subprocess.run(
             cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             check=True,
         )
         cap2 = cv2.VideoCapture(str(converted_path))

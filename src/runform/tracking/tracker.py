@@ -7,6 +7,7 @@ re-entry, and temporal 1€-filter keypoint smoothing to eliminate high-velocity
 from __future__ import annotations
 
 import math
+
 import numpy as np
 
 from runform.schema import Keypoint, PoseDetection

@@ -7,9 +7,8 @@ or Forefoot Strike (FFS) according to standard biomechanical definitions.
 
 from __future__ import annotations
 
-from collections import deque
 import math
-import numpy as np
+from collections import deque
 
 from runform.schema import FootStrikeType, Keypoint, PoseDetection
 

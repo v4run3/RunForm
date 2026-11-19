@@ -176,7 +176,7 @@ class MediaPipePoseDetector:
             self._pose.close()
             self._pose = None
 
-    def __enter__(self) -> "MediaPipePoseDetector":
+    def __enter__(self) -> MediaPipePoseDetector:
         self._ensure_model()
         return self
 

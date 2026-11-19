@@ -8,17 +8,16 @@ biomechanical evaluation without rule-based injury classification.
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
-from pathlib import Path
-from typing import Any, Sequence
 import csv
 import json
 import math
 import statistics
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
+from typing import Any, Sequence
 
 from .metrics import FrameMetrics, RunningFormMetrics, calculate_knee_asymmetry
 from .quality import (
-    DEFAULT_ANGLE_QUALITY_CONFIG,
     DEFAULT_RELIABILITY_CONFIG,
     AngleQualityConfig,
     ReliabilityConfig,

@@ -137,3 +137,4 @@ A sequence is marked `is_reliable = True` ONLY when:
 - $\text{valid\_pose\_ratio} \ge \text{threshold\_ratio}$
 - $\text{measurement\_ratio} \ge \text{min\_valid\_measurements\_ratio}$
 - Camera view is compatible (`camera_view not in ("front", "rear")`)
+

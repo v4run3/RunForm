@@ -6,24 +6,25 @@ foot strike classification, and injury risk assessment into a unified API.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Callable
+
 import cv2
 import numpy as np
 
 from runform.angles.calculator import BiomechanicsCalculator
 from runform.config import load_config
 from runform.detection.detector import BasePoseDetector, YOLOv8PoseDetector
-from runform.feedback.advisor import RiskAdvisor
 from runform.features.extractor import extract_video_features
+from runform.feedback.advisor import RiskAdvisor
 from runform.footstrike.detector import FootStrikeDetector
+from runform.pose.encoding import convert_to_browser_mp4
 from runform.schema import (
     BiomechanicalMetrics,
     FootStrikeType,
     FrameAnalysisResult,
-    PoseDetection,
     VideoAnalysisReport,
 )
-from runform.pose.encoding import convert_to_browser_mp4
 from runform.tracking.tracker import RunnerTracker
 from runform.utils.viz import draw_pose_overlay
 

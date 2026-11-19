@@ -18,8 +18,6 @@ from .metrics import (
     summarize_frame_metrics,
     write_metrics_csv,
 )
-
-
 from .temporal_analysis import analyze_temporal_movement
 
 

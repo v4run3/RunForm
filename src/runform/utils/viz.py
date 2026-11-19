@@ -8,8 +8,6 @@ import numpy as np
 from runform.schema import (
     BiomechanicalMetrics,
     FootStrikeType,
-    FormFeedback,
-    InjuryRiskLevel,
     PoseDetection,
 )
 
@@ -71,7 +69,7 @@ def draw_pose_overlay(
                 cv2.line(canvas, pt1, pt2, color, 3, cv2.LINE_AA)
 
         # Draw joint keypoints
-        for name, kp in kps.items():
+        for kp in kps.values():
             if kp.confidence >= min_confidence:
                 pt = (int(kp.x), int(kp.y))
                 cv2.circle(canvas, pt, 5, (0, 0, 255), -1, cv2.LINE_AA)

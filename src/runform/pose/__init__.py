@@ -23,7 +23,6 @@ from .quality import (
     is_measurement_valid_for_view,
     validate_angle_plausibility,
 )
-
 from .temporal_analysis import (
     TemporalAnalysisResult,
     TemporalFeatures,

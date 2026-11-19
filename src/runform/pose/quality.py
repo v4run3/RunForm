@@ -14,11 +14,11 @@ A high quality score does not guarantee correct biomechanics.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import math
+from dataclasses import dataclass
 from typing import Literal
 
-from .landmarks import CameraView, PoseResult
+from .landmarks import CameraView
 
 # Measurement quality status
 QualityStatus = Literal["valid", "implausible", "degraded", "unavailable"]

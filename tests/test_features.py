@@ -4,7 +4,11 @@ from pathlib import Path
 
 import pytest
 
-from runform.features.extractor import extract_video_features, select_primary_track_id, write_feature_csv
+from runform.features.extractor import (
+    extract_video_features,
+    select_primary_track_id,
+    write_feature_csv,
+)
 from runform.schema import (
     BiomechanicalMetrics,
     FootStrikeType,

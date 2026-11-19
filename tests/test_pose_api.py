@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import io
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
+
 import cv2
-from fastapi.testclient import TestClient
 import numpy as np
-import pytest
+from fastapi.testclient import TestClient
 
 from runform.api import POSE_MEDIA_DIR, app
-from runform.pose.encoding import convert_to_browser_mp4, find_ffmpeg_executable
+from runform.pose.encoding import find_ffmpeg_executable
 from runform.pose.metrics import FrameMetrics, RunningFormMetrics, RunningFormSummary
 from runform.pose.service import (
     PoseVideoAnalysisResult,
@@ -336,7 +336,11 @@ def test_frontend_camera_workflow_contract():
 
 def test_pose_analysis_endpoint_temporal_features(tmp_path: Path):
     """POST /api/pose-analysis should return temporal_analysis and serve temporal CSV."""
-    from runform.pose.temporal_analysis import TemporalAnalysisResult, TemporalFeatures, WindowTemporalResult
+    from runform.pose.temporal_analysis import (
+        TemporalAnalysisResult,
+        TemporalFeatures,
+        WindowTemporalResult,
+    )
 
     tf = TemporalFeatures(
         total_frames=30,

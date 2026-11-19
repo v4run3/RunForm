@@ -21,7 +21,7 @@ const API_BASE = '';
 /**
  * Determine the best supported recording MIME type in the current browser.
  */
-export const getSupportedRecordingMimeType = () => {
+const getSupportedRecordingMimeType = () => {
   if (typeof window === 'undefined' || typeof MediaRecorder === 'undefined' || !MediaRecorder.isTypeSupported) {
     return '';
   }
@@ -49,7 +49,7 @@ export const getSupportedRecordingMimeType = () => {
 /**
  * Extract a suitable file extension (.webm or .mp4) based on the recorded MIME type.
  */
-export const getExtensionForMimeType = (mimeType) => {
+const getExtensionForMimeType = (mimeType) => {
   if (!mimeType) return 'webm';
   const lower = mimeType.toLowerCase();
   if (lower.includes('mp4')) return 'mp4';
@@ -61,7 +61,7 @@ export const getExtensionForMimeType = (mimeType) => {
 /**
  * Generate a timestamped download filename for the annotated video.
  */
-export const getAnnotatedDownloadFilename = (date = new Date()) => {
+const getAnnotatedDownloadFilename = (date = new Date()) => {
   const pad = (n) => String(n).padStart(2, '0');
   const yyyy = date.getFullYear();
   const MM = pad(date.getMonth() + 1);
