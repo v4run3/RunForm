@@ -1,43 +1,41 @@
 import React, { useState } from 'react';
 import './App.css';
-import { UploadCloud, Camera, BookOpen, Footprints, History, LogOut } from 'lucide-react';
+import { UploadCloud, Camera, BookOpen, Footprints, History, LogOut, Home } from 'lucide-react';
 import VideoUploadView from './components/VideoUploadView';
 import LiveCameraView from './components/LiveCameraView';
 import BiomechanicsGuideView from './components/BiomechanicsGuideView';
-import AuthView from './components/AuthView';
 import AnalysisHistoryView from './components/AnalysisHistoryView';
-
-const SESSION_KEY = 'runform_session';
+import LandingPage from './components/LandingPage';
+import { getStoredSession, saveSession, clearSession } from './utils/authStorage';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('upload');
-  const [session, setSession] = useState(() => {
-    if (typeof window === 'undefined') return null;
-    const saved = localStorage.getItem(SESSION_KEY);
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  });
+  const [session, setSession] = useState(() => getStoredSession());
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
+  const [viewingLanding, setViewingLanding] = useState(false);
 
-  const handleAuth = (authSession) => {
-    localStorage.setItem(SESSION_KEY, JSON.stringify(authSession));
+  const handleAuth = (authSession, rememberOnLaptop = false) => {
+    saveSession(authSession, rememberOnLaptop);
     setSession(authSession);
+    setViewingLanding(false);
   };
 
   const logout = () => {
-    localStorage.removeItem(SESSION_KEY);
+    clearSession();
     setSession(null);
+    setViewingLanding(false);
     setActiveTab('upload');
   };
 
-  if (!session) {
-    return <AuthView onAuth={handleAuth} />;
+  // If user is not authenticated or explicitly chose to view the landing page
+  if (!session || viewingLanding) {
+    return (
+      <LandingPage
+        onAuth={handleAuth}
+        currentSession={session}
+        onBackToApp={session ? () => setViewingLanding(false) : null}
+      />
+    );
   }
 
   return (
@@ -84,9 +82,27 @@ export default function App() {
               Guide
             </button>
           </nav>
-          <button className="icon-btn" type="button" onClick={logout} aria-label="Log out" title="Log out">
-            <LogOut size={17} />
-          </button>
+
+          <div className="user-nav-actions">
+            <button
+              className="icon-btn"
+              type="button"
+              onClick={() => setViewingLanding(true)}
+              aria-label="View Landing Page"
+              title="Home / Landing Page"
+            >
+              <Home size={17} />
+            </button>
+            <button
+              className="icon-btn"
+              type="button"
+              onClick={logout}
+              aria-label="Log out"
+              title="Log out"
+            >
+              <LogOut size={17} />
+            </button>
+          </div>
         </div>
       </header>
 
@@ -98,7 +114,9 @@ export default function App() {
           />
         )}
         {activeTab === 'camera' && <LiveCameraView />}
-        {activeTab === 'history' && <AnalysisHistoryView token={session.token} refreshKey={historyRefreshKey} />}
+        {activeTab === 'history' && (
+          <AnalysisHistoryView token={session.token} refreshKey={historyRefreshKey} />
+        )}
         {activeTab === 'guide' && <BiomechanicsGuideView />}
       </main>
     </div>
