@@ -1,4 +1,6 @@
 # Development dependencies (tests + linting)
 -r requirements.txt
 pytest>=7.4
+pytest-asyncio>=0.23
+httpx>=0.24
 ruff>=0.2

@@ -16,4 +16,5 @@ pydantic>=2.0
 
 # Utilities & Config
 pyyaml>=6.0
+imageio-ffmpeg>=0.4.9
 
