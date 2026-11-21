@@ -27,7 +27,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements-dev.txt
           pip install -e .
 
@@ -35,7 +35,18 @@ jobs:
         run: ruff check src tests app
 
       - name: Test Python
-        run: python -m pytest -v
+        run: |
+          python -m pytest -v --tb=short | tee pytest_output.log
+
+      - name: Publish Test Results to Job Summary
+        if: always()
+        run: |
+          if [ -f pytest_output.log ]; then
+            echo "### 🧪 Pytest Test Results" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            cat pytest_output.log >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
 
   frontend-lint-and-build:
     runs-on: ubuntu-latest

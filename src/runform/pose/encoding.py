@@ -17,7 +17,11 @@ logger = logging.getLogger(__name__)
 
 
 def find_ffmpeg_executable() -> str | None:
-    """Locate a valid ffmpeg executable from imageio-ffmpeg or system PATH."""
+    """Locate a valid ffmpeg executable from system PATH or imageio-ffmpeg."""
+    system_ffmpeg = shutil.which("ffmpeg")
+    if system_ffmpeg:
+        return system_ffmpeg
+
     try:
         import imageio_ffmpeg
 
@@ -26,10 +30,6 @@ def find_ffmpeg_executable() -> str | None:
             return str(exe)
     except Exception:
         pass
-
-    system_ffmpeg = shutil.which("ffmpeg")
-    if system_ffmpeg:
-        return system_ffmpeg
 
     return None
 
