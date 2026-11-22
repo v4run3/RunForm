@@ -1380,3 +1380,125 @@
   }
 }
 
+/* ==========================================================================
+   VIDEO QUALITY ENHANCEMENT STYLES
+   ========================================================================== */
+
+.enhancement-panel {
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  background: linear-gradient(180deg, rgba(14, 20, 27, 0.72) 0%, rgba(8, 10, 14, 0.88) 100%);
+  border-radius: 12px;
+}
+
+.btn-preview-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  color: var(--accent-cyan);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.btn-preview-filter:hover:not(:disabled) {
+  background: rgba(56, 189, 248, 0.22);
+  border-color: var(--accent-cyan);
+}
+
+.btn-preview-filter:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.filter-chips-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.enhancement-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-card);
+  color: var(--text-main);
+  cursor: pointer;
+  transition: all 0.16s ease;
+  min-height: 52px;
+  justify-content: center;
+}
+
+.enhancement-chip:hover {
+  background: var(--bg-subtle);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.enhancement-chip.active {
+  background: rgba(56, 189, 248, 0.1);
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.18);
+}
+
+.chip-icon {
+  font-size: 1rem;
+  margin-bottom: 2px;
+}
+
+.chip-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.chip-desc {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  line-height: 1.3;
+  margin-top: 1px;
+}
+
+/* Enhancement Preview Modal */
+.preview-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 6, 8, 0.78);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 20px;
+}
+
+.preview-modal-card {
+  width: min(100%, 780px);
+  max-height: 90vh;
+  overflow-y: auto;
+  background: #0f1318;
+  border: 1px solid var(--border-card);
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+}
+
+.preview-frame-box {
+  background: #000;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+

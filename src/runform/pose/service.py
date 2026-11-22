@@ -13,6 +13,10 @@ import numpy as np
 from .detector import MediaPipePoseDetector
 from .drawing import draw_pose_overlay
 from .encoding import convert_to_browser_mp4, ensure_supported_input_video
+from .enhancement import (
+    compute_frame_quality,
+    enhance_frame,
+)
 from .metrics import (
     FrameMetrics,
     RunningFormSummary,
@@ -40,6 +44,7 @@ class PoseVideoAnalysisResult:
     height: int
     temporal_analysis: TemporalAnalysisResult | None = None
     temporal_csv_path: Path | None = None
+    quality_info: dict[str, object] | None = None
 
 
 def summary_to_dict(summary: RunningFormSummary) -> dict[str, object]:
@@ -83,6 +88,8 @@ def analyze_pose_frame_image(
     min_landmark_visibility: float = 0.3,
     filter_implausible: bool = True,
     quality_config: AngleQualityConfig | None = None,
+    enhancement_filter: str = "none",
+    enhancement_strength: float = 1.0,
 ) -> tuple[FrameMetrics, np.ndarray]:
     """Analyze one BGR frame and return metrics plus annotated image."""
     detector = MediaPipePoseDetector(
@@ -90,7 +97,11 @@ def analyze_pose_frame_image(
         min_tracking_confidence=min_tracking_confidence,
     )
     try:
-        result = detector.detect(frame)
+        proc_frame = frame
+        if enhancement_filter and enhancement_filter != "none":
+            proc_frame = enhance_frame(frame, filter_type=enhancement_filter, strength=enhancement_strength)
+
+        result = detector.detect(proc_frame)
         metrics = analyze_frame_metrics(
             frame_index=frame_index,
             timestamp=time.time(),
@@ -100,7 +111,7 @@ def analyze_pose_frame_image(
             quality_config=quality_config,
         )
         annotated = draw_pose_overlay(
-            frame,
+            proc_frame,
             result,
             metrics=metrics.metrics,
             min_visibility=min_landmark_visibility,
@@ -134,6 +145,8 @@ def analyze_pose_video_file(
     filter_implausible: bool = True,
     quality_config: AngleQualityConfig | None = None,
     reliability_config: ReliabilityConfig | None = None,
+    enhancement_filter: str = "none",
+    enhancement_strength: float = 1.0,
 ) -> PoseVideoAnalysisResult:
     """Analyze a video with MediaPipe, compute temporal movement features, and optionally save overlay video/CSVs."""
     input_path = Path(input_path)
@@ -166,6 +179,9 @@ def analyze_pose_video_file(
             min_tracking_confidence=min_tracking_confidence,
         )
         frame_records: list[FrameMetrics] = []
+        initial_blur_scores: list[float] = []
+        enhanced_blur_scores: list[float] = []
+        has_enhancement = bool(enhancement_filter and enhancement_filter != "none")
 
         try:
             while True:
@@ -174,7 +190,25 @@ def analyze_pose_video_file(
                     break
 
                 frame_index = len(frame_records)
-                result = detector.detect(frame)
+
+                # Track quality diagnostics sample (every 5 frames or first 20 frames)
+                if frame_index % 5 == 0 or frame_index < 20:
+                    q_init = compute_frame_quality(frame)
+                    initial_blur_scores.append(q_init.blur_score)
+
+                if has_enhancement:
+                    proc_frame = enhance_frame(
+                        frame,
+                        filter_type=enhancement_filter,
+                        strength=enhancement_strength,
+                    )
+                    if frame_index % 5 == 0 or frame_index < 20:
+                        q_enh = compute_frame_quality(proc_frame)
+                        enhanced_blur_scores.append(q_enh.blur_score)
+                else:
+                    proc_frame = frame
+
+                result = detector.detect(proc_frame)
                 frame_metrics = analyze_frame_metrics(
                     frame_index=frame_index,
                     timestamp=frame_index / fps,
@@ -187,7 +221,7 @@ def analyze_pose_video_file(
 
                 if writer is not None:
                     annotated = draw_pose_overlay(
-                        frame,
+                        proc_frame,
                         result,
                         metrics=frame_metrics.metrics,
                         min_visibility=min_landmark_visibility,
@@ -223,6 +257,22 @@ def analyze_pose_video_file(
             temporal_result.write_windows_csv(temporal_csv_output)
 
         summary = summarize_frame_metrics(frame_records)
+
+        avg_init_blur = float(np.mean(initial_blur_scores)) if initial_blur_scores else 0.0
+        avg_enh_blur = float(np.mean(enhanced_blur_scores)) if enhanced_blur_scores else avg_init_blur
+        sharpness_gain_pct = 0.0
+        if avg_init_blur > 0:
+            sharpness_gain_pct = round(((avg_enh_blur - avg_init_blur) / avg_init_blur) * 100.0, 1)
+
+        quality_info = {
+            "enhancement_filter": enhancement_filter,
+            "enhancement_strength": enhancement_strength,
+            "applied": has_enhancement,
+            "initial_blur_score": round(avg_init_blur, 2),
+            "enhanced_blur_score": round(avg_enh_blur, 2),
+            "sharpness_improvement_pct": sharpness_gain_pct,
+        }
+
         return PoseVideoAnalysisResult(
             frames=frame_records,
             summary=summary,
@@ -233,6 +283,7 @@ def analyze_pose_video_file(
             height=height,
             temporal_analysis=temporal_result,
             temporal_csv_path=temporal_csv_output,
+            quality_info=quality_info,
         )
     finally:
         if is_temp and usable_input.exists():

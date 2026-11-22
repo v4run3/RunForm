@@ -11,6 +11,7 @@ import cv2
 from .detector import MediaPipePoseDetector
 from .drawing import draw_pose_overlay
 from .encoding import convert_to_browser_mp4
+from .enhancement import enhance_frame
 from .metrics import (
     FrameMetrics,
     analyze_frame_metrics,
@@ -32,6 +33,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--smooth-window", type=int, default=1, help="Optional smoothing window size (1 = no smoothing).")
     parser.add_argument("--no-display", action="store_true", help="Process without opening a display window.")
     parser.add_argument("--camera-view", choices=["side", "front", "rear", "unknown"], default="unknown", help="Optional camera viewpoint metadata.")
+    parser.add_argument("--enhancement-filter", choices=["none", "auto", "unblur", "contrast", "low_light", "denoise"], default="none", help="Video enhancement filter to improve pose estimation quality.")
+    parser.add_argument("--enhancement-strength", type=float, default=1.0, help="Intensity of the enhancement filter (0.1 to 2.5).")
     parser.add_argument("--no-filter-implausible", action="store_true", help="Disable biomechanical plausibility filtering.")
     parser.add_argument("--model-complexity", type=int, default=1, choices=[0, 1, 2])
     parser.add_argument("--model-path", type=Path, default=None, help="Optional MediaPipe .task model path.")
@@ -92,7 +95,16 @@ def main(argv: list[str] | None = None) -> int:
 
             frame_index = len(frame_records)
             timestamp = frame_index / fps
-            result = detector.detect(frame)
+
+            proc_frame = frame
+            if args.enhancement_filter != "none":
+                proc_frame = enhance_frame(
+                    frame,
+                    filter_type=args.enhancement_filter,
+                    strength=args.enhancement_strength,
+                )
+
+            result = detector.detect(proc_frame)
             frame_metrics = analyze_frame_metrics(
                 frame_index=frame_index,
                 timestamp=timestamp,
@@ -105,7 +117,7 @@ def main(argv: list[str] | None = None) -> int:
             elapsed = time.perf_counter() - start_time
             live_fps = frame_index / elapsed if elapsed > 0 else 0.0
             annotated = draw_pose_overlay(
-                frame,
+                proc_frame,
                 result,
                 metrics=frame_metrics.metrics,
                 fps=live_fps,

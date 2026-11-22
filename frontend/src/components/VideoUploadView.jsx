@@ -14,6 +14,9 @@ import {
   Download,
   Clock,
   TrendingUp,
+  Wand2,
+  Sliders,
+  Eye,
 } from 'lucide-react';
 
 const API_BASE = '';
@@ -27,7 +30,54 @@ export default function VideoUploadView({ token, onSaved }) {
   const [yoloReport, setYoloReport] = useState(null);
   const [error, setError] = useState(null);
   const [videoError, setVideoError] = useState(null);
+  const [cameraView, setCameraView] = useState('side');
+  const [enhancementFilter, setEnhancementFilter] = useState('none');
+  const [enhancementStrength, setEnhancementStrength] = useState(1.0);
+  const [previewingFilter, setPreviewingFilter] = useState(false);
+  const [filterPreviewData, setFilterPreviewData] = useState(null);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [originalFrameB64, setOriginalFrameB64] = useState(null);
   const fileInputRef = useRef(null);
+  const videoPlayerRef = useRef(null);
+
+  const handlePreviewEnhancement = async () => {
+    if (!videoPlayerRef.current) return;
+    setPreviewingFilter(true);
+    setFilterPreviewData(null);
+    try {
+      const video = videoPlayerRef.current;
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 360;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const frameDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      setOriginalFrameB64(frameDataUrl);
+
+      const targetFilter = enhancementFilter === 'none' ? 'unblur' : enhancementFilter;
+      const res = await fetch(`${API_BASE}/api/pose-enhance-preview`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image_base64: frameDataUrl,
+          filter_type: targetFilter,
+          strength: parseFloat(enhancementStrength) || 1.0,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to generate preview from server');
+      }
+
+      const data = await res.json();
+      setFilterPreviewData(data);
+      setShowPreviewModal(true);
+    } catch (err) {
+      setError(`Enhancement preview failed: ${err.message}`);
+    } finally {
+      setPreviewingFilter(false);
+    }
+  };
 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
@@ -75,6 +125,10 @@ export default function VideoUploadView({ token, onSaved }) {
 
     try {
       if (analysisMode === 'mediapipe') {
+        formData.append('camera_view', cameraView);
+        formData.append('enhancement_filter', enhancementFilter);
+        formData.append('enhancement_strength', String(enhancementStrength));
+
         // MediaPipe Pose Running Form Analysis
         const res = await fetch(`${API_BASE}/api/pose-analysis`, {
           method: 'POST',
@@ -288,6 +342,226 @@ export default function VideoUploadView({ token, onSaved }) {
             </div>
           )}
 
+          {/* Video Enhancement & Viewpoint Controls Panel */}
+          {analysisMode === 'mediapipe' && (
+            <div className="glass-panel enhancement-panel" style={{ padding: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Wand2 size={18} color="var(--accent-cyan)" />
+                  <span style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                    Video Processing & Quality Enhancements
+                  </span>
+                  <span className="badge-pill" style={{ background: 'rgba(56, 189, 248, 0.15)', color: 'var(--accent-cyan)', fontSize: '0.7rem' }}>
+                    New
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button
+                    type="button"
+                    className="btn-preview-filter"
+                    onClick={handlePreviewEnhancement}
+                    disabled={previewingFilter || analyzing}
+                    title="Test selected enhancement filter on the current video frame"
+                  >
+                    {previewingFilter ? (
+                      <>
+                        <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                        Testing...
+                      </>
+                    ) : (
+                      <>
+                        <Eye size={14} />
+                        Preview Filter on Frame
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Viewpoint Selector */}
+              <div style={{ marginBottom: '14px' }}>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: 600 }}>
+                  Camera Viewpoint:
+                </div>
+                <div className="filter-chips-grid">
+                  <button
+                    type="button"
+                    className={`enhancement-chip ${cameraView === 'side' ? 'active' : ''}`}
+                    onClick={() => setCameraView('side')}
+                  >
+                    <span className="chip-title">Side View</span>
+                    <span className="chip-desc">Sagittal plane (Recommended)</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`enhancement-chip ${cameraView === 'front' ? 'active' : ''}`}
+                    onClick={() => setCameraView('front')}
+                  >
+                    <span className="chip-title">Front View</span>
+                    <span className="chip-desc">Lateral tilt analysis</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`enhancement-chip ${cameraView === 'rear' ? 'active' : ''}`}
+                    onClick={() => setCameraView('rear')}
+                  >
+                    <span className="chip-title">Rear View</span>
+                    <span className="chip-desc">Pronation & pelvic drop</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Filter Type Selector */}
+              <div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: 600 }}>
+                  Enhancement Filter:
+                </div>
+                <div className="filter-chips-grid">
+                  <button
+                    type="button"
+                    className={`enhancement-chip ${enhancementFilter === 'none' ? 'active' : ''}`}
+                    onClick={() => setEnhancementFilter('none')}
+                  >
+                    <span className="chip-icon">🚫</span>
+                    <span className="chip-title">None</span>
+                    <span className="chip-desc">Original untouched frames</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`enhancement-chip ${enhancementFilter === 'auto' ? 'active' : ''}`}
+                    onClick={() => setEnhancementFilter('auto')}
+                  >
+                    <span className="chip-icon">⚡</span>
+                    <span className="chip-title">Auto Enhance</span>
+                    <span className="chip-desc">Adaptive unblur + lighting</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`enhancement-chip ${enhancementFilter === 'unblur' ? 'active' : ''}`}
+                    onClick={() => setEnhancementFilter('unblur')}
+                  >
+                    <span className="chip-icon">🔍</span>
+                    <span className="chip-title">Unblur / Sharpen</span>
+                    <span className="chip-desc">Fixes motion blur & soft focus</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`enhancement-chip ${enhancementFilter === 'contrast' ? 'active' : ''}`}
+                    onClick={() => setEnhancementFilter('contrast')}
+                  >
+                    <span className="chip-icon">☀️</span>
+                    <span className="chip-title">Contrast (CLAHE)</span>
+                    <span className="chip-desc">Adaptive shadow/highlight balance</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`enhancement-chip ${enhancementFilter === 'low_light' ? 'active' : ''}`}
+                    onClick={() => setEnhancementFilter('low_light')}
+                  >
+                    <span className="chip-icon">🌙</span>
+                    <span className="chip-title">Low-Light Boost</span>
+                    <span className="chip-desc">Brightens underexposed runners</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`enhancement-chip ${enhancementFilter === 'denoise' ? 'active' : ''}`}
+                    onClick={() => setEnhancementFilter('denoise')}
+                  >
+                    <span className="chip-icon">🧼</span>
+                    <span className="chip-title">Denoise</span>
+                    <span className="chip-desc">Cleans camera grain & sensor noise</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Intensity Slider (only when a filter is chosen) */}
+              {enhancementFilter !== 'none' && (
+                <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--border-card)', display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Sliders size={15} color="var(--accent-cyan)" />
+                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                      Filter Intensity:
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="2.0"
+                    step="0.1"
+                    value={enhancementStrength}
+                    onChange={(e) => setEnhancementStrength(parseFloat(e.target.value))}
+                    style={{ flex: '1', minWidth: '160px', accentColor: 'var(--accent-cyan)', cursor: 'pointer' }}
+                  />
+                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--accent-cyan)', minWidth: '40px' }}>
+                    {enhancementStrength.toFixed(1)}x
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Interactive Before/After Preview Modal */}
+          {showPreviewModal && filterPreviewData && (
+            <div className="preview-modal-overlay" onClick={() => setShowPreviewModal(false)}>
+              <div className="preview-modal-card" onClick={(e) => e.stopPropagation()}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                  <div>
+                    <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                      Enhancement Preview: {filterPreviewData.filter_type?.toUpperCase()}
+                    </h3>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                      Intensity: {filterPreviewData.strength}x &bull; Sharpness gain: +{filterPreviewData.sharpness_improvement_pct}%
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="nav-tab-btn"
+                    style={{ padding: '4px 10px', fontSize: '0.8rem' }}
+                    onClick={() => setShowPreviewModal(false)}
+                  >
+                    Close
+                  </button>
+                </div>
+
+                <div className="grid-2col" style={{ gap: '14px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                      Original Frame (Sharpness: {filterPreviewData.initial_quality?.blur_score})
+                    </span>
+                    <div className="preview-frame-box">
+                      <img src={originalFrameB64} alt="Original frame" style={{ width: '100%', height: 'auto', borderRadius: '6px' }} />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--accent-cyan)' }}>
+                      Enhanced Frame (Sharpness: {filterPreviewData.enhanced_quality?.blur_score})
+                    </span>
+                    <div className="preview-frame-box">
+                      <img src={filterPreviewData.enhanced_image} alt="Enhanced frame" style={{ width: '100%', height: 'auto', borderRadius: '6px' }} />
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                  <div style={{ display: 'flex', gap: '12px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    <span>Initial brightness: {filterPreviewData.initial_quality?.brightness}</span>
+                    <span>Enhanced brightness: {filterPreviewData.enhanced_quality?.brightness}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    style={{ padding: '6px 14px', fontSize: '0.82rem' }}
+                    onClick={() => setShowPreviewModal(false)}
+                  >
+                    Use This Filter
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Videos Grid */}
           <div className="grid-2col">
             <div className="glass-panel" style={{ padding: '12px' }}>
@@ -295,7 +569,7 @@ export default function VideoUploadView({ token, onSaved }) {
                 Original Video
               </h4>
               <div className="video-wrapper">
-                <video src={previewUrl} controls playsInline />
+                <video ref={videoPlayerRef} src={previewUrl} controls playsInline crossOrigin="anonymous" />
               </div>
             </div>
 
@@ -369,6 +643,50 @@ export default function VideoUploadView({ token, onSaved }) {
               >
                 <Activity color="var(--accent-cyan)" size={19} /> Running Form Metrics
               </h3>
+
+              {/* Quality Enhancement Summary Badge */}
+              {poseResult?.quality_info?.applied && (
+                <div
+                  className="glass-panel"
+                  style={{
+                    padding: '12px 16px',
+                    marginBottom: '16px',
+                    borderLeft: '3px solid var(--accent-cyan)',
+                    background: 'rgba(56, 189, 248, 0.06)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '12px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <Wand2 size={18} color="var(--accent-cyan)" />
+                    <div>
+                      <div style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                        Quality Filter Active: {String(poseResult.quality_info.enhancement_filter).toUpperCase()} ({poseResult.quality_info.enhancement_strength}x)
+                      </div>
+                      <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        Raw blur score: {poseResult.quality_info.initial_blur_score} &bull; Enhanced sharpness score: {poseResult.quality_info.enhanced_blur_score}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: '999px',
+                        background: 'rgba(52, 211, 153, 0.15)',
+                        color: 'var(--accent-emerald)',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                      }}
+                    >
+                      +{poseResult.quality_info.sharpness_improvement_pct}% Sharpness
+                    </span>
+                  </div>
+                </div>
+              )}
 
               <div className="metrics-grid">
                 <div className="glass-panel metric-card">

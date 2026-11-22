@@ -27,6 +27,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from runform.pipeline import RunFormPipeline
+from runform.pose.enhancement import compute_frame_quality, enhance_frame
 from runform.pose.service import (
     analyze_pose_frame_image,
     analyze_pose_video_file,
@@ -192,6 +193,14 @@ class AuthRequest(BaseModel):
 class FrameAnalysisRequest(BaseModel):
     image_base64: str
     frame_idx: int = 0
+    enhancement_filter: str = "none"
+    enhancement_strength: float = 1.0
+
+
+class EnhancePreviewRequest(BaseModel):
+    image_base64: str
+    filter_type: str = "unblur"
+    strength: float = 1.0
 
 
 @app.get("/api/health")
@@ -443,6 +452,8 @@ def get_processed_video(video_id: str, user: dict[str, str] = Depends(current_us
 async def pose_analysis_endpoint(
     file: UploadFile = File(...),
     camera_view: str = Form("unknown"),
+    enhancement_filter: str = Form("none"),
+    enhancement_strength: float = Form(1.0),
 ) -> dict[str, Any]:
     """Run MediaPipe-based running-form analysis on an uploaded video.
 
@@ -468,6 +479,8 @@ async def pose_analysis_endpoint(
             output_path=str(output_path),
             temporal_csv_path=str(temporal_csv_path),
             camera_view=camera_view,
+            enhancement_filter=enhancement_filter,
+            enhancement_strength=enhancement_strength,
         )
 
         summary = summary_to_dict(result.summary)
@@ -484,6 +497,7 @@ async def pose_analysis_endpoint(
             "observations": summary.get("observations", []),
             "summary": summary,
             "temporal_analysis": temporal_dict,
+            "quality_info": result.quality_info,
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Pose analysis failed: {e}") from e
@@ -524,7 +538,7 @@ def get_pose_temporal_csv(analysis_id: str):
 
 @app.post("/api/pose-analysis-frame")
 def pose_analysis_frame_endpoint(payload: FrameAnalysisRequest) -> dict[str, Any]:
-    """Analyze a single frame using MediaPipe pose detection.
+    """Analyze a single frame using MediaPipe pose detection with optional quality enhancement.
 
     Returns annotated image, per-frame metrics, and pose detection status.
     This is independent of the existing YOLO pipeline.
@@ -542,6 +556,8 @@ def pose_analysis_frame_endpoint(payload: FrameAnalysisRequest) -> dict[str, Any
         frame_metrics, annotated = analyze_pose_frame_image(
             frame,
             frame_index=payload.frame_idx,
+            enhancement_filter=payload.enhancement_filter,
+            enhancement_strength=payload.enhancement_strength,
         )
 
         annotated_b64 = encode_frame_as_data_url(annotated) if annotated is not None else ""
@@ -552,6 +568,43 @@ def pose_analysis_frame_endpoint(payload: FrameAnalysisRequest) -> dict[str, Any
             "annotated_image": annotated_b64,
             "pose_detected": frame_metrics.pose_detected,
             "metrics": metrics_dict,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.post("/api/pose-enhance-preview")
+def pose_enhance_preview_endpoint(payload: EnhancePreviewRequest) -> dict[str, Any]:
+    """Generate an enhanced preview of a single frame with quality diagnostics."""
+    try:
+        header_split = payload.image_base64.split(",")
+        encoded_data = header_split[-1]
+        img_bytes = base64.b64decode(encoded_data)
+        np_arr = np.frombuffer(img_bytes, np.uint8)
+        frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+
+        if frame is None:
+            raise HTTPException(status_code=400, detail="Invalid image data")
+
+        init_metrics = compute_frame_quality(frame)
+        enhanced = enhance_frame(frame, filter_type=payload.filter_type, strength=payload.strength)
+        enh_metrics = compute_frame_quality(enhanced)
+
+        enhanced_b64 = encode_frame_as_data_url(enhanced)
+
+        sharpness_diff = 0.0
+        if init_metrics.blur_score > 0:
+            sharpness_diff = round(((enh_metrics.blur_score - init_metrics.blur_score) / init_metrics.blur_score) * 100.0, 1)
+
+        return {
+            "filter_type": payload.filter_type,
+            "strength": payload.strength,
+            "enhanced_image": enhanced_b64,
+            "initial_quality": init_metrics.to_dict(),
+            "enhanced_quality": enh_metrics.to_dict(),
+            "sharpness_improvement_pct": sharpness_diff,
         }
     except HTTPException:
         raise
