@@ -7,14 +7,12 @@ import {
   Camera,
   Activity,
   BookOpen,
-  ArrowRight,
   ShieldCheck,
   CheckCircle,
   Eye,
   EyeOff,
   Laptop,
   Smartphone,
-  ChevronRight,
 } from 'lucide-react';
 import { isMobileDevice } from '../utils/authStorage';
 
@@ -84,7 +82,7 @@ export default function LandingPage({ onAuth, currentSession = null, onBackToApp
           </div>
         </div>
 
-        <nav className="landing-nav-links">
+        <nav className="landing-nav-links" aria-label="About RunForm">
           <a href="#features">Features</a>
           <a href="#how-it-works">How It Works</a>
           <a href="#biomechanics">Biomechanics</a>
@@ -126,20 +124,15 @@ export default function LandingPage({ onAuth, currentSession = null, onBackToApp
       {/* Hero Section */}
       <section className="landing-hero-section">
         <div className="hero-content">
-          <div className="hero-pill">
-            <span className="hero-pill-badge">NEW</span>
-            <span>Temporal Gait Kinematics & Plausibility Filtering</span>
-          </div>
+          <div className="hero-pill"><Activity size={16} /> Running gait analysis</div>
 
           <h1 className="hero-headline">
-            Analyze Your Running Form. <br />
-            <span className="gradient-text">Prevent Injuries. Run Smarter.</span>
+            See how you run.
           </h1>
 
           <p className="hero-subhead">
-            RunForm combines computer vision, 33-point MediaPipe pose estimation, and
-            temporal kinematics to evaluate knee flexion, trunk lean, bilateral symmetry,
-            and gait dynamics in real time—without wearable sensors.
+            Upload a clip or record with your camera to measure knee motion, trunk lean,
+            and left–right symmetry across your stride.
           </p>
 
           <div className="hero-actions">
@@ -149,7 +142,6 @@ export default function LandingPage({ onAuth, currentSession = null, onBackToApp
               onClick={() => scrollToAuth('register')}
             >
               <span>Get Started Free</span>
-              <ArrowRight size={17} />
             </button>
             <button
               type="button"
@@ -161,38 +153,6 @@ export default function LandingPage({ onAuth, currentSession = null, onBackToApp
             </button>
           </div>
 
-          {/* Quick Metrics Badges */}
-          <div className="hero-metrics-bar">
-            <div className="hero-metric-item">
-              <strong>120°+</strong>
-              <span>Knee ROM Tracking</span>
-            </div>
-            <div className="hero-metric-divider" />
-            <div className="hero-metric-item">
-              <strong>30+ FPS</strong>
-              <span>Real-Time Analysis</span>
-            </div>
-            <div className="hero-metric-divider" />
-            <div className="hero-metric-item">
-              <strong>Zero</strong>
-              <span>Wearables Needed</span>
-            </div>
-          </div>
-
-          {/* Device Persistence Note */}
-          <div className="device-status-indicator">
-            {isMobile ? (
-              <div className="device-badge mobile">
-                <Smartphone size={14} />
-                <span>Mobile Device: You will stay signed in automatically until you log out.</span>
-              </div>
-            ) : (
-              <div className="device-badge laptop">
-                <Laptop size={14} />
-                <span>Laptop Mode: Landing page shown on app launch. Active session kept during tab use.</span>
-              </div>
-            )}
-          </div>
         </div>
 
         {/* Embedded Hero Auth Card */}
@@ -208,10 +168,11 @@ export default function LandingPage({ onAuth, currentSession = null, onBackToApp
             </div>
 
             {/* Auth Mode Toggle */}
-            <div className="auth-tab-switch" role="tablist">
+            <div className="auth-tab-switch" role="group" aria-label="Account access">
               <button
                 type="button"
                 className={`auth-tab-btn ${authMode === 'login' ? 'active' : ''}`}
+                aria-pressed={authMode === 'login'}
                 onClick={() => {
                   setAuthMode('login');
                   setError(null);
@@ -223,6 +184,7 @@ export default function LandingPage({ onAuth, currentSession = null, onBackToApp
               <button
                 type="button"
                 className={`auth-tab-btn ${authMode === 'register' ? 'active' : ''}`}
+                aria-pressed={authMode === 'register'}
                 onClick={() => {
                   setAuthMode('register');
                   setError(null);
@@ -240,6 +202,7 @@ export default function LandingPage({ onAuth, currentSession = null, onBackToApp
                   <input
                     id="auth-name-input"
                     type="text"
+                    autoComplete="name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="e.g. Alex Miller"
@@ -253,6 +216,7 @@ export default function LandingPage({ onAuth, currentSession = null, onBackToApp
                 <input
                   id="auth-email-input"
                   type="email"
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="runner@example.com"
@@ -266,6 +230,7 @@ export default function LandingPage({ onAuth, currentSession = null, onBackToApp
                   <input
                     id="auth-password-input"
                     type={showPassword ? 'text' : 'password'}
+                    autoComplete={authMode === 'login' ? 'current-password' : 'new-password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="At least 6 characters"
@@ -297,7 +262,7 @@ export default function LandingPage({ onAuth, currentSession = null, onBackToApp
                 </div>
               )}
 
-              {error && <div className="auth-error-banner">{error}</div>}
+              {error && <div className="auth-error-banner" role="alert">{error}</div>}
 
               <button type="submit" className="btn-submit-auth" disabled={loading}>
                 {loading ? (
@@ -305,12 +270,10 @@ export default function LandingPage({ onAuth, currentSession = null, onBackToApp
                 ) : authMode === 'login' ? (
                   <>
                     <span>Sign In to RunForm</span>
-                    <ArrowRight size={16} />
                   </>
                 ) : (
                   <>
                     <span>Create Free Account</span>
-                    <ArrowRight size={16} />
                   </>
                 )}
               </button>
@@ -346,6 +309,10 @@ export default function LandingPage({ onAuth, currentSession = null, onBackToApp
                   </button>
                 </p>
               )}
+            </div>
+            <div className="device-badge">
+              {isMobile ? <Smartphone size={15} /> : <Laptop size={15} />}
+              <span>{isMobile ? 'Stay signed in on this device until you log out.' : 'By default, sign-in lasts for this browser session.'}</span>
             </div>
           </div>
         </div>
@@ -530,7 +497,6 @@ export default function LandingPage({ onAuth, currentSession = null, onBackToApp
               onClick={() => scrollToAuth('register')}
             >
               <span>Analyze Your Form Now</span>
-              <ChevronRight size={16} />
             </button>
           </div>
         </div>

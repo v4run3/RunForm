@@ -430,19 +430,9 @@ export default function LiveCameraView() {
   const annotatedVideoUrl = analysisResult?.video_url || analysisResult?.annotated_video_url;
 
   return (
-    <div className="view-container">
+    <div className="view-container camera-view">
       {/* Disclaimer Banner */}
-      <div
-        className="glass-panel"
-        style={{
-          padding: '12px 16px',
-          display: 'flex',
-          gap: '10px',
-          alignItems: 'flex-start',
-          borderLeft: '3px solid var(--accent-amber)',
-          marginBottom: '16px',
-        }}
-      >
+      <div className="view-disclaimer">
         <Info size={16} color="var(--accent-amber)" style={{ flexShrink: 0, marginTop: '2px' }} />
         <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
           RunForm provides 2D movement/form observations and is not a medical diagnostic or injury-prediction system.
@@ -450,21 +440,12 @@ export default function LiveCameraView() {
       </div>
 
       {/* Header and Stage Navigation */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '12px',
-          marginBottom: '16px',
-        }}
-      >
+      <div className="view-heading">
         <div>
-          <h2 style={{ fontSize: '1.2rem', fontWeight: 700 }}>
+          <h1>
             {status === 'RESULTS' ? 'Running Form Analysis Results' : 'Camera Recording & Form Analysis'}
-          </h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.86rem', marginTop: '2px' }}>
+          </h1>
+          <p>
             {status === 'IDLE' && 'Position your camera to capture full-body side view during running.'}
             {status === 'RECORDING' && 'Recording running movement in progress. Keep runner fully in frame.'}
             {status === 'RECORDED' && 'Recording complete. Review your clip and proceed with MediaPipe analysis.'}
@@ -567,24 +548,21 @@ export default function LiveCameraView() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Main Single Camera / Video Area */}
           <div
-            className="glass-panel"
+            className="glass-panel camera-frame"
             style={{
-              padding: '16px',
               position: 'relative',
               borderRadius: '16px',
-              border: status === 'RECORDING' ? '2px solid var(--accent-rose)' : '1px solid var(--border-glass)',
+              borderColor: status === 'RECORDING' ? 'var(--accent-rose)' : undefined,
               transition: 'border-color 0.3s ease',
             }}
           >
             {/* Live Camera Viewfinder (Visible in IDLE when camera active, or while RECORDING) */}
             <div
-              className="video-wrapper"
+              className="video-wrapper camera-stage"
               style={{
-                minHeight: '360px',
                 display: status === 'RECORDED' || status === 'ANALYZING' ? 'none' : 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                background: '#090d14',
                 borderRadius: '12px',
                 overflow: 'hidden',
                 position: 'relative',
@@ -606,7 +584,7 @@ export default function LiveCameraView() {
 
               {/* Inactive Camera Placeholder in IDLE */}
               {!cameraActive && status === 'IDLE' && (
-                <div style={{ textAlign: 'center', padding: '32px 18px', maxWidth: '440px' }}>
+                <div className="camera-placeholder">
                   <div
                     style={{
                       width: '64px',
@@ -624,11 +602,8 @@ export default function LiveCameraView() {
                   <h3 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: '8px' }}>
                     Camera Ready
                   </h3>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.5, marginBottom: '16px' }}>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.5 }}>
                     Position yourself so your full body is visible, then start recording.
-                  </p>
-                  <p style={{ fontSize: '0.78rem', color: 'var(--text-soft)' }}>
-                    Captures high-resolution video for subsequent 33-point MediaPipe Pose biomechanics evaluation.
                   </p>
                 </div>
               )}
@@ -673,9 +648,8 @@ export default function LiveCameraView() {
             {/* Recorded Video Playback (Visible in RECORDED or ANALYZING) */}
             {(status === 'RECORDED' || status === 'ANALYZING') && recordedVideoUrl && (
               <div
-                className="video-wrapper"
+                className="video-wrapper camera-stage"
                 style={{
-                  minHeight: '360px',
                   background: '#090d14',
                   borderRadius: '12px',
                   overflow: 'hidden',
@@ -719,7 +693,7 @@ export default function LiveCameraView() {
 
           {/* Prominent Action Controls Bar */}
           <div
-            className="glass-panel"
+            className="glass-panel camera-controls"
             style={{
               padding: '16px 20px',
               display: 'flex',
@@ -731,14 +705,6 @@ export default function LiveCameraView() {
           >
             {/* Status Information */}
             <div>
-              {status === 'IDLE' && (
-                <div>
-                  <h4 style={{ fontSize: '0.96rem', fontWeight: 600 }}>Ready to Record</h4>
-                  <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                    Click "Start Recording" to capture your running gait.
-                  </p>
-                </div>
-              )}
               {status === 'RECORDING' && (
                 <div>
                   <h4 style={{ fontSize: '0.96rem', fontWeight: 600, color: 'var(--accent-rose)' }}>

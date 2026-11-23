@@ -64,10 +64,10 @@ export default function AnalysisHistoryView({ token, refreshKey }) {
 
   return (
     <div className="view-container">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+      <div className="view-heading">
         <div>
-          <h2 style={{ fontSize: '1.14rem', fontWeight: 700 }}>History</h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.86rem', marginTop: '4px' }}>
+          <h1>Analysis history</h1>
+          <p>
             Saved reviews for this account.
           </p>
         </div>
@@ -79,7 +79,7 @@ export default function AnalysisHistoryView({ token, refreshKey }) {
       {error && <div className="glass-panel" style={{ padding: '14px', color: 'var(--accent-rose)' }}>{error}</div>}
       {loading && <div className="glass-panel" style={{ padding: '18px', color: 'var(--text-muted)' }}>Loading...</div>}
       {!loading && items.length === 0 && (
-        <div className="glass-panel" style={{ padding: '18px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+        <div className="glass-panel history-empty">
           No saved reviews yet. Upload a video and run a review to see it here.
         </div>
       )}

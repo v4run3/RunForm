@@ -8,6 +8,13 @@ import AnalysisHistoryView from './components/AnalysisHistoryView';
 import LandingPage from './components/LandingPage';
 import { getStoredSession, saveSession, clearSession } from './utils/authStorage';
 
+const workspaceTabs = [
+  { id: 'upload', label: 'Upload', icon: UploadCloud },
+  { id: 'camera', label: 'Camera', icon: Camera },
+  { id: 'history', label: 'History', icon: History },
+  { id: 'guide', label: 'Guide', icon: BookOpen },
+];
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('upload');
   const [session, setSession] = useState(() => getStoredSession());
@@ -46,43 +53,28 @@ export default function App() {
             <Footprints size={19} />
           </div>
           <div className="brand-text">
-            <h1>RunForm</h1>
-            <p>{session.user.name}</p>
+            <span className="brand-title">RunForm</span>
+            <p>Running analysis</p>
           </div>
         </div>
 
-        <div className="top-actions">
-          <nav className="nav-tabs" aria-label="Primary navigation">
+        <nav className="nav-tabs" aria-label="Primary navigation">
+          {workspaceTabs.map(({ id, label, icon: Icon }) => (
             <button
-              className={`nav-tab-btn ${activeTab === 'upload' ? 'active' : ''}`}
-              onClick={() => setActiveTab('upload')}
+              key={id}
+              type="button"
+              className={`nav-tab-btn ${activeTab === id ? 'active' : ''}`}
+              aria-current={activeTab === id ? 'page' : undefined}
+              onClick={() => setActiveTab(id)}
             >
-              <UploadCloud size={16} />
-              Upload
+              <Icon size={19} aria-hidden="true" />
+              <span>{label}</span>
             </button>
-            <button
-              className={`nav-tab-btn ${activeTab === 'camera' ? 'active' : ''}`}
-              onClick={() => setActiveTab('camera')}
-            >
-              <Camera size={16} />
-              Camera
-            </button>
-            <button
-              className={`nav-tab-btn ${activeTab === 'history' ? 'active' : ''}`}
-              onClick={() => setActiveTab('history')}
-            >
-              <History size={16} />
-              History
-            </button>
-            <button
-              className={`nav-tab-btn ${activeTab === 'guide' ? 'active' : ''}`}
-              onClick={() => setActiveTab('guide')}
-            >
-              <BookOpen size={16} />
-              Guide
-            </button>
-          </nav>
+          ))}
+        </nav>
 
+        <div className="workspace-account">
+          <p className="workspace-user" title={session.user.name}>{session.user.name}</p>
           <div className="user-nav-actions">
             <button
               className="icon-btn"
@@ -106,7 +98,7 @@ export default function App() {
         </div>
       </header>
 
-      <main>
+      <main className="workspace-main">
         {activeTab === 'upload' && (
           <VideoUploadView
             token={session.token}

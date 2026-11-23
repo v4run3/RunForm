@@ -15,11 +15,18 @@ import {
   Clock,
   TrendingUp,
   Wand2,
-  Sliders,
   Eye,
+  BookOpen,
 } from 'lucide-react';
 
 const API_BASE = '';
+const FILTER_LABELS = {
+  auto: 'Auto enhance',
+  unblur: 'Unblur / sharpen',
+  contrast: 'Contrast',
+  low_light: 'Low-light boost',
+  denoise: 'Denoise',
+};
 
 export default function VideoUploadView({ token, onSaved }) {
   const [selectedFile, setSelectedFile] = useState(null);
@@ -31,13 +38,12 @@ export default function VideoUploadView({ token, onSaved }) {
   const [error, setError] = useState(null);
   const [videoError, setVideoError] = useState(null);
   const [cameraView, setCameraView] = useState('side');
-  const [enhancementFilter, setEnhancementFilter] = useState('none');
-  const [enhancementStrength, setEnhancementStrength] = useState(1.0);
+  const [enhancementFilters, setEnhancementFilters] = useState([]);
+  const [enhancementStrengths, setEnhancementStrengths] = useState({});
   const [previewingFilter, setPreviewingFilter] = useState(false);
   const [filterPreviewData, setFilterPreviewData] = useState(null);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [originalFrameB64, setOriginalFrameB64] = useState(null);
-  const fileInputRef = useRef(null);
   const videoPlayerRef = useRef(null);
 
   const handlePreviewEnhancement = async () => {
@@ -54,14 +60,16 @@ export default function VideoUploadView({ token, onSaved }) {
       const frameDataUrl = canvas.toDataURL('image/jpeg', 0.85);
       setOriginalFrameB64(frameDataUrl);
 
-      const targetFilter = enhancementFilter === 'none' ? 'unblur' : enhancementFilter;
+      const targetFilters = enhancementFilters.length ? enhancementFilters : ['unblur'];
       const res = await fetch(`${API_BASE}/api/pose-enhance-preview`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           image_base64: frameDataUrl,
-          filter_type: targetFilter,
-          strength: parseFloat(enhancementStrength) || 1.0,
+          filter_type: targetFilters,
+          strengths: Object.fromEntries(
+            targetFilters.map((filter) => [filter, enhancementStrengths[filter] ?? 1.0]),
+          ),
         }),
       });
 
@@ -126,8 +134,8 @@ export default function VideoUploadView({ token, onSaved }) {
     try {
       if (analysisMode === 'mediapipe') {
         formData.append('camera_view', cameraView);
-        formData.append('enhancement_filter', enhancementFilter);
-        formData.append('enhancement_strength', String(enhancementStrength));
+        formData.append('enhancement_filter', enhancementFilters.join(','));
+        formData.append('enhancement_strengths', JSON.stringify(enhancementStrengths));
 
         // MediaPipe Pose Running Form Analysis
         const res = await fetch(`${API_BASE}/api/pose-analysis`, {
@@ -172,19 +180,9 @@ export default function VideoUploadView({ token, onSaved }) {
   const poseVideoUrl = poseResult?.video_url || poseResult?.annotated_video_url;
 
   return (
-    <div className="view-container">
+    <div className="view-container upload-view">
       {/* Educational & Disclaimer Banner */}
-      <div
-        className="glass-panel"
-        style={{
-          padding: '12px 16px',
-          display: 'flex',
-          gap: '10px',
-          alignItems: 'flex-start',
-          borderLeft: '3px solid var(--accent-amber)',
-          marginBottom: '16px',
-        }}
-      >
+      <div className="view-disclaimer">
         <Info size={16} color="var(--accent-amber)" style={{ flexShrink: 0, marginTop: '2px' }} />
         <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
           RunForm provides 2D movement/form observations and is not a medical diagnostic or injury-prediction system.
@@ -192,77 +190,65 @@ export default function VideoUploadView({ token, onSaved }) {
       </div>
 
       {/* Analysis Mode Selector */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '12px',
-          marginBottom: '16px',
-        }}
-      >
+      <div className="view-heading">
         <div>
-          <h2 style={{ fontSize: '1.2rem', fontWeight: 700 }}>Running Form Analysis</h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.86rem', marginTop: '2px' }}>
+          <h1>Running form analysis</h1>
+          <p>
             Upload a running video to evaluate joint angles, symmetry, and running mechanics.
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px', background: 'var(--bg-subtle)', padding: '4px', borderRadius: '8px' }}>
+        <div className="analysis-switch" role="group" aria-label="Analysis mode">
           <button
             type="button"
             className={`nav-tab-btn ${analysisMode === 'mediapipe' ? 'active' : ''}`}
             onClick={() => setAnalysisMode('mediapipe')}
-            style={{ padding: '6px 12px', fontSize: '0.82rem' }}
+            aria-pressed={analysisMode === 'mediapipe'}
           >
-            <Sparkles size={14} /> Running Form (MediaPipe)
+            <Sparkles size={17} />
+            <span>Running form <small>MediaPipe</small></span>
           </button>
           <button
             type="button"
             className={`nav-tab-btn ${analysisMode === 'yolo' ? 'active' : ''}`}
             onClick={() => setAnalysisMode('yolo')}
-            style={{ padding: '6px 12px', fontSize: '0.82rem' }}
+            aria-pressed={analysisMode === 'yolo'}
           >
-            <Layers size={14} /> Full Gait (YOLO)
+            <Layers size={17} />
+            <span>Full gait <small>YOLO</small></span>
           </button>
         </div>
       </div>
 
       {!selectedFile && (
-        <div
-          className="upload-dropzone"
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileChange}
-            accept="video/*,video/mp4,video/quicktime,video/mov,video/webm,video/avi"
-            style={{ display: 'none' }}
-          />
-          <div className="upload-icon">
-            <Upload size={28} />
+        <div className="upload-layout">
+          <div className="upload-dropzone" onDragOver={(e) => e.preventDefault()} onDrop={handleDrop}>
+            <input
+              id="running-video-input"
+              className="visually-hidden"
+              type="file"
+              onChange={handleFileChange}
+              accept="video/*,video/mp4,video/quicktime,video/mov,video/webm,video/avi"
+              aria-labelledby="running-video-label"
+              aria-describedby="running-video-formats"
+            />
+            <label className="upload-picker" htmlFor="running-video-input">
+              <span className="upload-icon"><Upload size={25} aria-hidden="true" /></span>
+              <strong id="running-video-label">Upload a running video</strong>
+              <span className="upload-drop-hint">Drop a video here or choose a file.</span>
+              <span className="btn-primary">Choose video</span>
+              <span className="upload-formats" id="running-video-formats">MP4, MOV or WEBM up to 150 MB</span>
+            </label>
           </div>
-          <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '8px' }}>
-            Upload a running video
-          </h3>
-          <p
-            style={{
-              color: 'var(--text-muted)',
-              fontSize: '0.9rem',
-              lineHeight: 1.5,
-              maxWidth: '420px',
-              margin: '0 auto 16px',
-            }}
-          >
-            Choose a side-view running clip. Keep the runner fully visible in the frame for optimal landmark tracking.
-          </p>
-          <span style={{ fontSize: '0.78rem', color: 'var(--text-soft)', fontWeight: 600 }}>
-            MP4, MOV or WEBM up to 150MB
-          </span>
+          <aside className="glass-panel capture-tips">
+            <BookOpen size={22} aria-hidden="true" />
+            <h2>Capture tips</h2>
+            <ul>
+              <li>Film from the side.</li>
+              <li>Keep the runner in frame from head to toe.</li>
+              <li>Use a steady camera and good lighting.</li>
+            </ul>
+          </aside>
         </div>
       )}
 
@@ -344,158 +330,133 @@ export default function VideoUploadView({ token, onSaved }) {
 
           {/* Video Enhancement & Viewpoint Controls Panel */}
           {analysisMode === 'mediapipe' && (
-            <div className="glass-panel enhancement-panel" style={{ padding: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '14px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Wand2 size={18} color="var(--accent-cyan)" />
-                  <span style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                    Video Processing & Quality Enhancements
-                  </span>
-                  <span className="badge-pill" style={{ background: 'rgba(56, 189, 248, 0.15)', color: 'var(--accent-cyan)', fontSize: '0.7rem' }}>
-                    New
-                  </span>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <button
-                    type="button"
-                    className="btn-preview-filter"
-                    onClick={handlePreviewEnhancement}
-                    disabled={previewingFilter || analyzing}
-                    title="Test selected enhancement filter on the current video frame"
-                  >
-                    {previewingFilter ? (
-                      <>
-                        <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} />
-                        Testing...
-                      </>
-                    ) : (
-                      <>
-                        <Eye size={14} />
-                        Preview Filter on Frame
-                      </>
-                    )}
-                  </button>
-                </div>
+            <div className="glass-panel enhancement-panel">
+              <div className="enhancement-header">
+                <h2>Video processing</h2>
+                <button
+                  type="button"
+                  className="btn-preview-filter"
+                  onClick={handlePreviewEnhancement}
+                  disabled={previewingFilter || analyzing}
+                  title="Test selected enhancement filter on the current video frame"
+                >
+                  {previewingFilter ? (
+                    <>
+                      <RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                      Loading preview…
+                    </>
+                  ) : (
+                    <>
+                      <Eye size={14} />
+                      Preview filter
+                    </>
+                  )}
+                </button>
               </div>
 
-              {/* Viewpoint Selector */}
-              <div style={{ marginBottom: '14px' }}>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: 600 }}>
-                  Camera Viewpoint:
-                </div>
-                <div className="filter-chips-grid">
-                  <button
-                    type="button"
-                    className={`enhancement-chip ${cameraView === 'side' ? 'active' : ''}`}
-                    onClick={() => setCameraView('side')}
-                  >
-                    <span className="chip-title">Side View</span>
-                    <span className="chip-desc">Sagittal plane (Recommended)</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={`enhancement-chip ${cameraView === 'front' ? 'active' : ''}`}
-                    onClick={() => setCameraView('front')}
-                  >
-                    <span className="chip-title">Front View</span>
-                    <span className="chip-desc">Lateral tilt analysis</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={`enhancement-chip ${cameraView === 'rear' ? 'active' : ''}`}
-                    onClick={() => setCameraView('rear')}
-                  >
-                    <span className="chip-title">Rear View</span>
-                    <span className="chip-desc">Pronation & pelvic drop</span>
-                  </button>
-                </div>
-              </div>
+              {/* Viewpoint is an input to posture analysis, while filters prepare the video. */}
+              <div className="processing-groups">
+                <fieldset className="processing-options">
+                  <legend>Video viewpoint for posture analysis</legend>
+                  <div className="filter-chips-grid viewpoint-grid">
+                    <button type="button" className={`enhancement-chip ${cameraView === 'side' ? 'active' : ''}`} onClick={() => setCameraView('side')} aria-pressed={cameraView === 'side'}>
+                      <span className="chip-title">Side</span><span className="chip-desc">Best for gait</span>
+                    </button>
+                    <button type="button" className={`enhancement-chip ${cameraView === 'front' ? 'active' : ''}`} onClick={() => setCameraView('front')} aria-pressed={cameraView === 'front'}>
+                      <span className="chip-title">Front</span><span className="chip-desc">Lateral tilt</span>
+                    </button>
+                    <button type="button" className={`enhancement-chip ${cameraView === 'rear' ? 'active' : ''}`} onClick={() => setCameraView('rear')} aria-pressed={cameraView === 'rear'}>
+                      <span className="chip-title">Rear</span><span className="chip-desc">Pronation & pelvic drop</span>
+                    </button>
+                  </div>
+                </fieldset>
 
-              {/* Filter Type Selector */}
-              <div>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: 600 }}>
-                  Enhancement Filter:
-                </div>
-                <div className="filter-chips-grid">
+                <fieldset className="processing-options">
+                  <legend>Enhancements, select any that apply</legend>
+                  <div className="filter-chips-grid filter-grid">
                   <button
                     type="button"
-                    className={`enhancement-chip ${enhancementFilter === 'none' ? 'active' : ''}`}
-                    onClick={() => setEnhancementFilter('none')}
+                    className={`enhancement-chip ${enhancementFilters.length === 0 ? 'active' : ''}`}
+                    onClick={() => setEnhancementFilters([])}
+                    aria-pressed={enhancementFilters.length === 0}
+                    title="Use the original video without enhancement"
                   >
-                    <span className="chip-icon">🚫</span>
                     <span className="chip-title">None</span>
-                    <span className="chip-desc">Original untouched frames</span>
                   </button>
                   <button
                     type="button"
-                    className={`enhancement-chip ${enhancementFilter === 'auto' ? 'active' : ''}`}
-                    onClick={() => setEnhancementFilter('auto')}
+                    className={`enhancement-chip ${enhancementFilters.includes('auto') ? 'active' : ''}`}
+                    onClick={() => setEnhancementFilters((filters) => filters.includes('auto') ? filters.filter((filter) => filter !== 'auto') : [...filters.filter((filter) => filter !== 'auto'), 'auto'])}
+                    aria-pressed={enhancementFilters.includes('auto')}
+                    title="Adaptive sharpening and lighting"
                   >
-                    <span className="chip-icon">⚡</span>
-                    <span className="chip-title">Auto Enhance</span>
-                    <span className="chip-desc">Adaptive unblur + lighting</span>
+                    <span className="chip-title">Auto enhance</span>
                   </button>
                   <button
                     type="button"
-                    className={`enhancement-chip ${enhancementFilter === 'unblur' ? 'active' : ''}`}
-                    onClick={() => setEnhancementFilter('unblur')}
+                    className={`enhancement-chip ${enhancementFilters.includes('unblur') ? 'active' : ''}`}
+                    onClick={() => setEnhancementFilters((filters) => filters.includes('unblur') ? filters.filter((filter) => filter !== 'unblur') : [...filters.filter((filter) => filter !== 'auto'), 'unblur'])}
+                    aria-pressed={enhancementFilters.includes('unblur')}
+                    title="Reduce motion blur and soft focus"
                   >
-                    <span className="chip-icon">🔍</span>
-                    <span className="chip-title">Unblur / Sharpen</span>
-                    <span className="chip-desc">Fixes motion blur & soft focus</span>
+                    <span className="chip-title">Unblur / sharpen</span>
                   </button>
                   <button
                     type="button"
-                    className={`enhancement-chip ${enhancementFilter === 'contrast' ? 'active' : ''}`}
-                    onClick={() => setEnhancementFilter('contrast')}
+                    className={`enhancement-chip ${enhancementFilters.includes('contrast') ? 'active' : ''}`}
+                    onClick={() => setEnhancementFilters((filters) => filters.includes('contrast') ? filters.filter((filter) => filter !== 'contrast') : [...filters.filter((filter) => filter !== 'auto'), 'contrast'])}
+                    aria-pressed={enhancementFilters.includes('contrast')}
+                    title="Use adaptive contrast to balance shadows and highlights"
                   >
-                    <span className="chip-icon">☀️</span>
-                    <span className="chip-title">Contrast (CLAHE)</span>
-                    <span className="chip-desc">Adaptive shadow/highlight balance</span>
+                    <span className="chip-title">Contrast</span>
                   </button>
                   <button
                     type="button"
-                    className={`enhancement-chip ${enhancementFilter === 'low_light' ? 'active' : ''}`}
-                    onClick={() => setEnhancementFilter('low_light')}
+                    className={`enhancement-chip ${enhancementFilters.includes('low_light') ? 'active' : ''}`}
+                    onClick={() => setEnhancementFilters((filters) => filters.includes('low_light') ? filters.filter((filter) => filter !== 'low_light') : [...filters.filter((filter) => filter !== 'auto'), 'low_light'])}
+                    aria-pressed={enhancementFilters.includes('low_light')}
+                    title="Brighten dark footage"
                   >
-                    <span className="chip-icon">🌙</span>
-                    <span className="chip-title">Low-Light Boost</span>
-                    <span className="chip-desc">Brightens underexposed runners</span>
+                    <span className="chip-title">Low-light boost</span>
                   </button>
                   <button
                     type="button"
-                    className={`enhancement-chip ${enhancementFilter === 'denoise' ? 'active' : ''}`}
-                    onClick={() => setEnhancementFilter('denoise')}
+                    className={`enhancement-chip ${enhancementFilters.includes('denoise') ? 'active' : ''}`}
+                    onClick={() => setEnhancementFilters((filters) => filters.includes('denoise') ? filters.filter((filter) => filter !== 'denoise') : [...filters.filter((filter) => filter !== 'auto'), 'denoise'])}
+                    aria-pressed={enhancementFilters.includes('denoise')}
+                    title="Reduce grain and sensor noise"
                   >
-                    <span className="chip-icon">🧼</span>
                     <span className="chip-title">Denoise</span>
-                    <span className="chip-desc">Cleans camera grain & sensor noise</span>
                   </button>
-                </div>
+                  </div>
+                </fieldset>
               </div>
 
               {/* Intensity Slider (only when a filter is chosen) */}
-              {enhancementFilter !== 'none' && (
-                <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--border-card)', display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Sliders size={15} color="var(--accent-cyan)" />
-                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)' }}>
-                      Filter Intensity:
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0.5"
-                    max="2.0"
-                    step="0.1"
-                    value={enhancementStrength}
-                    onChange={(e) => setEnhancementStrength(parseFloat(e.target.value))}
-                    style={{ flex: '1', minWidth: '160px', accentColor: 'var(--accent-cyan)', cursor: 'pointer' }}
-                  />
-                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--accent-cyan)', minWidth: '40px' }}>
-                    {enhancementStrength.toFixed(1)}x
-                  </span>
+              {enhancementFilters.length > 0 && (
+                <div className="filter-intensities">
+                  {enhancementFilters.map((filter) => {
+                    const inputId = `intensity-${filter}`;
+                    const strength = enhancementStrengths[filter] ?? 1.0;
+                    return (
+                      <div className="filter-intensity" key={filter}>
+                        <label htmlFor={inputId}>{FILTER_LABELS[filter]} intensity</label>
+                        <input
+                          id={inputId}
+                          type="range"
+                          min="0.5"
+                          max="2.0"
+                          step="0.1"
+                          value={strength}
+                          onChange={(event) => setEnhancementStrengths((values) => ({
+                            ...values,
+                            [filter]: parseFloat(event.target.value),
+                          }))}
+                        />
+                        <output htmlFor={inputId}>{strength.toFixed(1)}x</output>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -508,10 +469,13 @@ export default function VideoUploadView({ token, onSaved }) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                   <div>
                     <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                      Enhancement Preview: {filterPreviewData.filter_type?.toUpperCase()}
+                      Enhancement Preview: {(Array.isArray(filterPreviewData.filter_type) ? filterPreviewData.filter_type : [filterPreviewData.filter_type]).join(' + ').toUpperCase()}
                     </h3>
                     <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                      Intensity: {filterPreviewData.strength}x &bull; Sharpness gain: +{filterPreviewData.sharpness_improvement_pct}%
+                      {(filterPreviewData.strengths
+                        ? Object.entries(filterPreviewData.strengths).map(([filter, strength]) => `${FILTER_LABELS[filter] || filter}: ${strength.toFixed(1)}x`).join(' · ')
+                        : `Intensity: ${filterPreviewData.strength}x`)}
+                      {' · '}Sharpness gain: +{filterPreviewData.sharpness_improvement_pct}%
                     </p>
                   </div>
                   <button
@@ -607,18 +571,7 @@ export default function VideoUploadView({ token, onSaved }) {
                     Annotated video could not be played. Check the generated video codec/format.
                   </video>
                 ) : (
-                  <div
-                    style={{
-                      minHeight: '220px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'var(--text-muted)',
-                      fontSize: '0.88rem',
-                      padding: '18px',
-                      textAlign: 'center',
-                    }}
-                  >
+                  <div className="analysis-placeholder">
                     {analyzing
                       ? 'Processing video & generating skeleton overlay...'
                       : 'Click "Analyze Form" to generate the skeleton overlay.'}

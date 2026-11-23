@@ -199,8 +199,9 @@ class FrameAnalysisRequest(BaseModel):
 
 class EnhancePreviewRequest(BaseModel):
     image_base64: str
-    filter_type: str = "unblur"
+    filter_type: str | list[str] = "unblur"
     strength: float = 1.0
+    strengths: dict[str, float] | None = None
 
 
 @app.get("/api/health")
@@ -454,6 +455,7 @@ async def pose_analysis_endpoint(
     camera_view: str = Form("unknown"),
     enhancement_filter: str = Form("none"),
     enhancement_strength: float = Form(1.0),
+    enhancement_strengths: str = Form("{}"),
 ) -> dict[str, Any]:
     """Run MediaPipe-based running-form analysis on an uploaded video.
 
@@ -474,6 +476,13 @@ async def pose_analysis_endpoint(
             shutil.copyfileobj(file.file, f)
 
         temporal_csv_path = pose_dir / "temporal_windows.csv"
+        try:
+            parsed_strengths = json.loads(enhancement_strengths)
+        except json.JSONDecodeError as exc:
+            raise HTTPException(status_code=400, detail="Invalid per-filter intensity values") from exc
+        if not isinstance(parsed_strengths, dict):
+            raise HTTPException(status_code=400, detail="Per-filter intensity values must be an object")
+
         result = analyze_pose_video_file(
             input_path=str(input_path),
             output_path=str(output_path),
@@ -481,6 +490,7 @@ async def pose_analysis_endpoint(
             camera_view=camera_view,
             enhancement_filter=enhancement_filter,
             enhancement_strength=enhancement_strength,
+            enhancement_strengths=parsed_strengths,
         )
 
         summary = summary_to_dict(result.summary)
@@ -589,7 +599,12 @@ def pose_enhance_preview_endpoint(payload: EnhancePreviewRequest) -> dict[str, A
             raise HTTPException(status_code=400, detail="Invalid image data")
 
         init_metrics = compute_frame_quality(frame)
-        enhanced = enhance_frame(frame, filter_type=payload.filter_type, strength=payload.strength)
+        enhanced = enhance_frame(
+            frame,
+            filter_type=payload.filter_type,
+            strength=payload.strength,
+            strengths=payload.strengths,
+        )
         enh_metrics = compute_frame_quality(enhanced)
 
         enhanced_b64 = encode_frame_as_data_url(enhanced)
@@ -601,6 +616,7 @@ def pose_enhance_preview_endpoint(payload: EnhancePreviewRequest) -> dict[str, A
         return {
             "filter_type": payload.filter_type,
             "strength": payload.strength,
+            "strengths": payload.strengths or {},
             "enhanced_image": enhanced_b64,
             "initial_quality": init_metrics.to_dict(),
             "enhanced_quality": enh_metrics.to_dict(),

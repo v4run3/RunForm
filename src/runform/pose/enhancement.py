@@ -8,6 +8,7 @@ poor contrast, sensor noise).
 from __future__ import annotations
 
 import enum
+import functools
 from dataclasses import dataclass
 
 import cv2
@@ -45,6 +46,13 @@ class QualityMetrics:
             "is_low_light": self.is_low_light,
             "is_low_contrast": self.is_low_contrast,
         }
+
+
+@functools.lru_cache(maxsize=16)
+def _gamma_lut(gamma: float, gain: float) -> np.ndarray:
+    inv_gamma = 1.0 / max(0.2, gamma)
+    table = np.array([((i / 255.0) ** inv_gamma) * 255 * gain for i in range(256)])
+    return np.clip(table, 0, 255).astype(np.uint8)
 
 
 def compute_frame_quality(frame: np.ndarray) -> QualityMetrics:
@@ -148,11 +156,7 @@ def apply_low_light_boost(
         return frame
 
     # Build gamma lookup table for O(1) pixel transformation
-    inv_gamma = 1.0 / max(0.2, gamma)
-    table = np.array([((i / 255.0) ** inv_gamma) * 255 * gain for i in np.arange(0, 256)]).astype("uint8")
-    table = np.clip(table, 0, 255).astype("uint8")
-
-    brightened = cv2.LUT(frame, table)
+    brightened = cv2.LUT(frame, _gamma_lut(round(gamma, 4), round(gain, 4)))
     # Apply mild CLAHE to retain local edge contrast
     return apply_contrast_clahe(brightened, clip_limit=1.8, tile_grid_size=(8, 8))
 
@@ -203,14 +207,15 @@ def apply_auto_enhancement(
 
 def enhance_frame(
     frame: np.ndarray,
-    filter_type: str | EnhancementFilter = EnhancementFilter.NONE,
+    filter_type: str | EnhancementFilter | list[str] | tuple[str, ...] = EnhancementFilter.NONE,
     strength: float = 1.0,
+    strengths: dict[str, float] | None = None,
 ) -> np.ndarray:
     """Enhance a frame using the specified filter mode.
 
     Args:
         frame: BGR image.
-        filter_type: 'none', 'auto', 'unblur', 'contrast', 'low_light', 'denoise'.
+        filter_type: One or more filters: 'auto', 'unblur', 'contrast', 'low_light', 'denoise'.
         strength: Multiplier (0.1 to 2.5).
 
     Returns:
@@ -219,27 +224,26 @@ def enhance_frame(
     if frame is None or frame.size == 0:
         return frame
 
-    f_type = str(filter_type).lower().strip()
+    if isinstance(filter_type, (list, tuple)):
+        filter_types = [str(value).lower().strip() for value in filter_type]
+    else:
+        filter_types = [value.strip() for value in str(filter_type).lower().split(",")]
 
-    if f_type in ("none", "off", "", "null"):
-        return frame
-
-    if f_type in ("unblur", "sharpen", "deblur"):
-        return apply_unblur(frame, strength=strength)
-
-    if f_type in ("contrast", "clahe"):
-        clip_limit = max(1.0, min(2.5 * strength, 5.0))
-        return apply_contrast_clahe(frame, clip_limit=clip_limit)
-
-    if f_type in ("low_light", "brighten", "night"):
-        gamma = 1.0 + (0.4 * strength)
-        return apply_low_light_boost(frame, gamma=gamma)
-
-    if f_type in ("denoise", "smooth"):
-        return apply_denoise(frame, strength=strength)
-
-    if f_type in ("auto", "adaptive"):
-        return apply_auto_enhancement(frame, strength=strength)
-
-    # Default fallback
-    return frame
+    output = frame
+    for f_type in filter_types:
+        filter_strength = strengths.get(f_type, strength) if strengths else strength
+        if f_type in ("none", "off", "", "null"):
+            continue
+        if f_type in ("unblur", "sharpen", "deblur"):
+            output = apply_unblur(output, strength=filter_strength)
+        elif f_type in ("contrast", "clahe"):
+            clip_limit = max(1.0, min(2.5 * filter_strength, 5.0))
+            output = apply_contrast_clahe(output, clip_limit=clip_limit)
+        elif f_type in ("low_light", "brighten", "night"):
+            gamma = 1.0 + (0.4 * filter_strength)
+            output = apply_low_light_boost(output, gamma=gamma)
+        elif f_type in ("denoise", "smooth"):
+            output = apply_denoise(output, strength=filter_strength)
+        elif f_type in ("auto", "adaptive"):
+            output = apply_auto_enhancement(output, strength=filter_strength)
+    return output

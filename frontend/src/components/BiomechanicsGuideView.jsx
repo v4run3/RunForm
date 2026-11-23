@@ -1,16 +1,16 @@
 import React from 'react';
-import { BookOpen, ShieldCheck, Layers, Activity } from 'lucide-react';
+import { ShieldCheck, Layers, Activity } from 'lucide-react';
 
 export default function BiomechanicsGuideView() {
   return (
-    <div className="view-container">
-      <div className="glass-panel" style={{ padding: '18px' }}>
-        <h2 style={{ fontSize: '1.12rem', fontWeight: 700, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <BookOpen color="var(--accent-cyan)" size={19} /> How the review works
-        </h2>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: 1.6 }}>
-          RunForm uses video pose points to estimate a few practical signals: foot strike, knee angle, trunk lean and risk flags.
-        </p>
+    <div className="view-container guide-view">
+      <div className="view-heading">
+        <div>
+          <h1>Biomechanics guide</h1>
+          <p>
+            RunForm uses video pose points to estimate foot strike, knee angle, trunk lean and risk flags.
+          </p>
+        </div>
       </div>
 
       <div className="grid-2col">

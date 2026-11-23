@@ -90,6 +90,7 @@ def analyze_pose_frame_image(
     quality_config: AngleQualityConfig | None = None,
     enhancement_filter: str = "none",
     enhancement_strength: float = 1.0,
+    enhancement_strengths: dict[str, float] | None = None,
 ) -> tuple[FrameMetrics, np.ndarray]:
     """Analyze one BGR frame and return metrics plus annotated image."""
     detector = MediaPipePoseDetector(
@@ -99,7 +100,12 @@ def analyze_pose_frame_image(
     try:
         proc_frame = frame
         if enhancement_filter and enhancement_filter != "none":
-            proc_frame = enhance_frame(frame, filter_type=enhancement_filter, strength=enhancement_strength)
+            proc_frame = enhance_frame(
+                frame,
+                filter_type=enhancement_filter,
+                strength=enhancement_strength,
+                strengths=enhancement_strengths,
+            )
 
         result = detector.detect(proc_frame)
         metrics = analyze_frame_metrics(
@@ -147,6 +153,7 @@ def analyze_pose_video_file(
     reliability_config: ReliabilityConfig | None = None,
     enhancement_filter: str = "none",
     enhancement_strength: float = 1.0,
+    enhancement_strengths: dict[str, float] | None = None,
 ) -> PoseVideoAnalysisResult:
     """Analyze a video with MediaPipe, compute temporal movement features, and optionally save overlay video/CSVs."""
     input_path = Path(input_path)
@@ -181,7 +188,13 @@ def analyze_pose_video_file(
         frame_records: list[FrameMetrics] = []
         initial_blur_scores: list[float] = []
         enhanced_blur_scores: list[float] = []
-        has_enhancement = bool(enhancement_filter and enhancement_filter != "none")
+        enhancement_filters = (
+            enhancement_filter
+            if isinstance(enhancement_filter, (list, tuple))
+            else str(enhancement_filter).split(",")
+        )
+        enhancement_filters = [value.strip() for value in enhancement_filters if value.strip()]
+        has_enhancement = any(value not in ("none", "off") for value in enhancement_filters)
 
         try:
             while True:
@@ -201,6 +214,7 @@ def analyze_pose_video_file(
                         frame,
                         filter_type=enhancement_filter,
                         strength=enhancement_strength,
+                        strengths=enhancement_strengths,
                     )
                     if frame_index % 5 == 0 or frame_index < 20:
                         q_enh = compute_frame_quality(proc_frame)
@@ -267,6 +281,7 @@ def analyze_pose_video_file(
         quality_info = {
             "enhancement_filter": enhancement_filter,
             "enhancement_strength": enhancement_strength,
+            "enhancement_strengths": enhancement_strengths or {},
             "applied": has_enhancement,
             "initial_blur_score": round(avg_init_blur, 2),
             "enhanced_blur_score": round(avg_enh_blur, 2),
